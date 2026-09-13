@@ -32,7 +32,7 @@ export default function App() {
         <Route path="/reportes" element={<Reportes />} />
         <Route path="/pagos-fijos" element={<PagosFijos />} />
         <Route path="/por-confirmar" element={<PorConfirmar />} />
-        <Route path="/metas/matrimonio" element={<MetaMatrimonio />} />
+        <Route path="/metas/:goalId" element={<MetaMatrimonio />} />
         <Route path="/ajustes" element={<Ajustes />} />
         <Route path="/ajustes/categorias" element={<Categorias />} />
         <Route path="/ajustes/correo" element={<ConectarCorreo />} />

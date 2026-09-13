@@ -13,6 +13,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useRealtimeTable } from '../hooks/useRealtimeTable'
 import {
+  accountToRow,
   categoryToRow,
   mapAccount,
   mapBudget,
@@ -22,6 +23,7 @@ import {
   mapSavingsGoal,
   mapSettlement,
   mapTransaction,
+  savingsGoalToRow,
   settlementToRow,
   transactionToRow,
 } from '../lib/mappers'
@@ -52,6 +54,10 @@ interface DataContextValue {
   confirmDraft: (id: string, overrides?: Partial<Pick<Transaction, 'categoryId' | 'split'>>) => void
   discardDraft: (id: string) => void
   addSettlement: (settlement: Omit<Settlement, 'id'>) => void
+  addBudget: (categoryId: string, monthlyLimit: number) => void
+  addAccount: (account: Omit<Account, 'id'>) => void
+  reconcileAccount: (id: string, balance: number) => void
+  addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => void
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -168,6 +174,28 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('settlements').insert(settlementToRow(householdId, s))
   }
 
+  async function addBudget(categoryId: string, monthlyLimit: number) {
+    if (!supabase || !householdId) return
+    await supabase
+      .from('budgets')
+      .upsert({ household_id: householdId, category_id: categoryId, monthly_limit: monthlyLimit }, { onConflict: 'household_id,category_id' })
+  }
+
+  async function addAccount(account: Omit<Account, 'id'>) {
+    if (!supabase || !householdId) return
+    await supabase.from('accounts').insert(accountToRow(householdId, account))
+  }
+
+  async function reconcileAccount(id: string, balance: number) {
+    if (!supabase) return
+    await supabase.from('accounts').update({ balance, last_reconciled_at: new Date().toISOString().slice(0, 10) }).eq('id', id)
+  }
+
+  async function addSavingsGoal(goal: Omit<SavingsGoal, 'id'>) {
+    if (!supabase || !householdId) return
+    await supabase.from('savings_goals').insert(savingsGoalToRow(householdId, goal))
+  }
+
   const value: DataContextValue = {
     transactions,
     categories,
@@ -183,6 +211,10 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     confirmDraft,
     discardDraft,
     addSettlement,
+    addBudget,
+    addAccount,
+    reconcileAccount,
+    addSavingsGoal,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
@@ -196,6 +228,9 @@ function RealDataProvider({ children }: { children: ReactNode }) {
 function MockDataProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(TRANSACTIONS)
   const [categories, setCategories] = useState<Category[]>(CATEGORIES)
+  const [budgets, setBudgets] = useState<Budget[]>(BUDGETS)
+  const [accounts, setAccounts] = useState<Account[]>(ACCOUNTS)
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(SAVINGS_GOALS)
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>(RECURRING_PAYMENTS)
   const [draftTransactions, setDraftTransactions] = useState<DraftTransaction[]>(DRAFT_TRANSACTIONS)
   const [settlements, setSettlements] = useState<Settlement[]>(SETTLEMENTS)
@@ -204,10 +239,10 @@ function MockDataProvider({ children }: { children: ReactNode }) {
     () => ({
       transactions,
       categories,
-      budgets: BUDGETS,
-      accounts: ACCOUNTS,
+      budgets,
+      accounts,
       recurringPayments,
-      savingsGoals: SAVINGS_GOALS,
+      savingsGoals,
       settlements,
       draftTransactions,
       addTransaction: (tx) => setTransactions((prev) => [{ ...tx, id: crypto.randomUUID() }, ...prev]),
@@ -239,8 +274,20 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       },
       discardDraft: (id) => setDraftTransactions((prev) => prev.filter((d) => d.id !== id)),
       addSettlement: (s) => setSettlements((prev) => [{ ...s, id: crypto.randomUUID() }, ...prev]),
+      addBudget: (categoryId, monthlyLimit) =>
+        setBudgets((prev) =>
+          prev.some((b) => b.categoryId === categoryId)
+            ? prev.map((b) => (b.categoryId === categoryId ? { ...b, monthlyLimit } : b))
+            : [...prev, { categoryId, monthlyLimit }],
+        ),
+      addAccount: (account) => setAccounts((prev) => [...prev, { ...account, id: crypto.randomUUID() }]),
+      reconcileAccount: (id, balance) =>
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, balance, lastReconciledAt: new Date().toISOString().slice(0, 10) } : a)),
+        ),
+      addSavingsGoal: (goal) => setSavingsGoals((prev) => [...prev, { ...goal, id: crypto.randomUUID() }]),
     }),
-    [transactions, categories, recurringPayments, draftTransactions, settlements],
+    [transactions, categories, budgets, accounts, savingsGoals, recurringPayments, draftTransactions, settlements],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

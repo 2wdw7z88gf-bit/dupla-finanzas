@@ -44,6 +44,16 @@ export function mapBudget(row: any): Budget {
   return { categoryId: row.category_id, monthlyLimit: num(row.monthly_limit) }
 }
 
+export function accountToRow(householdId: string, account: Omit<Account, 'id'>) {
+  return {
+    household_id: householdId,
+    name: account.name,
+    balance: account.balance,
+    annual_interest_rate: account.annualInterestRate,
+    last_reconciled_at: account.lastReconciledAt,
+  }
+}
+
 export function mapAccount(row: any): Account {
   return {
     id: row.id,
@@ -75,6 +85,19 @@ export function mapSavingsGoal(row: any): SavingsGoal {
     currentAmount: num(row.current_amount),
     targetDate: row.target_date ?? undefined,
     monthlyContributionPlan: row.monthly_contribution_plan == null ? undefined : num(row.monthly_contribution_plan),
+  }
+}
+
+export function savingsGoalToRow(householdId: string, goal: Omit<SavingsGoal, 'id'>) {
+  return {
+    household_id: householdId,
+    name: goal.name,
+    icon: goal.icon,
+    color: goal.color,
+    target_amount: goal.targetAmount,
+    current_amount: goal.currentAmount,
+    target_date: goal.targetDate ?? null,
+    monthly_contribution_plan: goal.monthlyContributionPlan ?? null,
   }
 }
 

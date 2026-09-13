@@ -1,16 +1,28 @@
 import { useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { AlertTriangleIcon, PlusIcon, RingsIcon } from '../components/icons/Icons'
 import { useData } from '../state/DataContext'
 import { goalProjection } from '../lib/calc'
 import { formatCLP, formatDate } from '../lib/format'
+import type { SavingsGoal } from '../types'
 
 const STEP = 10000
 
 export function MetaMatrimonio() {
+  const { goalId } = useParams()
   const { savingsGoals } = useData()
-  const goal = savingsGoals.find((g) => g.id === 'g3')!
+  const goal = savingsGoals.find((g) => g.id === goalId && g.targetDate)
+
+  if (!goal) {
+    return <PageHeader title="Meta no encontrada" backTo="/reportes" />
+  }
+
+  return <GoalSimulator goal={goal} />
+}
+
+function GoalSimulator({ goal }: { goal: SavingsGoal }) {
   const [monthly, setMonthly] = useState(goal.monthlyContributionPlan ?? 100000)
 
   const { monthsLeft, projected, shortfall, breakEvenMonthly } = goalProjection({
@@ -23,7 +35,7 @@ export function MetaMatrimonio() {
 
   return (
     <div>
-      <PageHeader title="Meta: Matrimonio" backTo="/reportes" />
+      <PageHeader title={`Meta: ${goal.name}`} backTo="/reportes" />
 
       <div className="bg-surface border border-border rounded-2xl p-6 mb-5.5 text-center">
         <div className="w-12 h-9.5 mx-auto mb-3 flex items-center justify-center">
