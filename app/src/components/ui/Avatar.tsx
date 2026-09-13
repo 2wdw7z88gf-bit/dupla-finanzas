@@ -1,11 +1,11 @@
-import type { Person } from '../../types'
+type AvatarPerson = { initial: string; color: 'coral' | 'teal' }
 
-const CLASSES: Record<Person['color'], string> = {
+const CLASSES: Record<AvatarPerson['color'], string> = {
   coral: 'bg-coral-soft text-coral',
   teal: 'bg-teal-soft text-teal',
 }
 
-export function Avatar({ person, size = 40 }: { person: Person; size?: number }) {
+export function Avatar({ person, size = 40 }: { person: AvatarPerson; size?: number }) {
   return (
     <div
       className={`${CLASSES[person.color]} rounded-full flex items-center justify-center font-bold shrink-0`}

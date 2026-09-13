@@ -14,11 +14,16 @@ import {
 } from '../components/icons/Icons'
 import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
+import { useAuth } from '../state/AuthContext'
 import { categoryById, categorySpent, computeBalance, projectedAccountBalance, recentTransactions, totalByType } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
 
 export function Dashboard() {
   const { transactions, categories, budgets, accounts, recurringPayments, settlements, draftTransactions } = useData()
+  const { member } = useAuth()
+  const me = member
+    ? { id: 'me', name: member.displayName, initial: member.displayName.charAt(0).toUpperCase(), color: member.color }
+    : PEOPLE.luciana
   const spent = totalByType(transactions, categories, 'gasto')
   const income = totalByType(transactions, categories, 'ingreso')
   const budgetTotal = budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
@@ -34,9 +39,9 @@ export function Dashboard() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4.5">
-        <h1 className="font-serif text-[21px] font-semibold">Hola, Luciana</h1>
+        <h1 className="font-serif text-[21px] font-semibold">Hola, {me.name}</h1>
         <Link to="/ajustes">
-          <Avatar person={PEOPLE.luciana} />
+          <Avatar person={me} />
         </Link>
       </div>
 

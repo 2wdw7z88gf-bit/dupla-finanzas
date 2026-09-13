@@ -2,35 +2,40 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LockIcon } from '../components/icons/Icons'
 import { HeartIcon } from '../components/icons/Icons'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { useAuth } from '../state/AuthContext'
 
 export function Login() {
   const navigate = useNavigate()
+  const { signIn, signUp } = useAuth()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [checkEmail, setCheckEmail] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (!isSupabaseConfigured || !supabase) {
-      // Demo mode: no backend configured yet, just enter the app.
-      navigate('/')
+    if (!isSupabaseConfigured) {
+      navigate('/') // demo mode: no backend configured yet, just enter the app
       return
     }
 
     setLoading(true)
-    const { error } =
-      mode === 'login'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password })
+    const result = mode === 'login' ? await signIn(email, password) : await signUp(email, password, name || email.split('@')[0])
     setLoading(false)
 
-    if (error) {
-      setError(error.message)
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+    if (mode === 'signup') {
+      // If email confirmation is on, there's no session yet — tell them to check their inbox.
+      setCheckEmail(true)
       return
     }
     navigate('/')
@@ -57,49 +62,78 @@ export function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="w-full bg-surface border border-border rounded-[20px] p-6">
-          <label className="text-xs font-bold text-text-muted uppercase tracking-wide">Correo</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="tú@correo.com"
-            className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mt-1.5 mb-4 bg-bg outline-none"
-          />
-
-          <label className="text-xs font-bold text-text-muted uppercase tracking-wide">Contraseña</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mt-1.5 mb-5 bg-bg outline-none"
-          />
-
-          {error && <div className="text-xs text-danger font-semibold mb-4">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-60"
-          >
-            {loading ? 'Cargando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-          </button>
-
-          <div className="flex items-center gap-2.5 my-5">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-text-muted">o</span>
-            <div className="flex-1 h-px bg-border" />
+        {checkEmail ? (
+          <div className="w-full bg-surface border border-border rounded-[20px] p-6 text-center">
+            <p className="text-sm leading-relaxed">
+              Te enviamos un correo a <b>{email}</b> para confirmar tu cuenta. Ábrelo y vuelve acá para iniciar sesión.
+            </p>
+            <button
+              onClick={() => {
+                setCheckEmail(false)
+                setMode('login')
+              }}
+              className="mt-5 text-coral font-bold text-sm"
+            >
+              Ya confirmé, quiero iniciar sesión
+            </button>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="w-full bg-surface border border-border rounded-[20px] p-6">
+            {mode === 'signup' && (
+              <>
+                <label className="text-xs font-bold text-text-muted uppercase tracking-wide">Tu nombre</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Gonzalo o Luciana"
+                  className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mt-1.5 mb-4 bg-bg outline-none"
+                />
+              </>
+            )}
 
-          <button
-            type="button"
-            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="w-full border-[1.5px] border-coral text-coral font-bold text-sm rounded-xl py-3.5"
-          >
-            {mode === 'login' ? 'Crear cuenta e invitar a mi pareja' : 'Ya tengo cuenta'}
-          </button>
-        </form>
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wide">Correo</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tú@correo.com"
+              className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mt-1.5 mb-4 bg-bg outline-none"
+            />
+
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wide">Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mt-1.5 mb-5 bg-bg outline-none"
+            />
+
+            {error && <div className="text-xs text-danger font-semibold mb-4">{error}</div>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-60"
+            >
+              {loading ? 'Cargando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+            </button>
+
+            <div className="flex items-center gap-2.5 my-5">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-text-muted">o</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              className="w-full border-[1.5px] border-coral text-coral font-bold text-sm rounded-xl py-3.5"
+            >
+              {mode === 'login' ? 'Crear cuenta e invitar a mi pareja' : 'Ya tengo cuenta'}
+            </button>
+          </form>
+        )}
 
         <div className="flex items-center gap-2 text-text-muted text-[12.5px] mt-6 text-center leading-relaxed">
           <LockIcon size={15} className="shrink-0" />

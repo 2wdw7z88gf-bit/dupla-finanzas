@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
+import { RequireAuth } from './components/RequireAuth'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Movimientos } from './pages/Movimientos'
@@ -17,7 +18,13 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route element={<AppShell />}>
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+      >
         <Route path="/" element={<Dashboard />} />
         <Route path="/movimientos" element={<Movimientos />} />
         <Route path="/presupuestos" element={<Presupuestos />} />

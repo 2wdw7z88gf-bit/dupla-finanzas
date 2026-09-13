@@ -16,16 +16,17 @@ import {
 import { Avatar } from '../components/ui/Avatar'
 import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../state/AuthContext'
 
 export function Ajustes() {
   const { categories, accounts } = useData()
+  const { signOut } = useAuth()
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState(true)
   const [reconcileReminder, setReconcileReminder] = useState(true)
 
   async function handleLogout() {
-    if (supabase) await supabase.auth.signOut()
+    await signOut()
     navigate('/login')
   }
 
