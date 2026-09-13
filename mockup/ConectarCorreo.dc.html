@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:oklch(97% 0.012 75);
+  --surface:oklch(99% 0.005 75);
+  --surface-2:oklch(95% 0.015 75);
+  --text:oklch(23% 0.02 55);
+  --text-muted:oklch(53% 0.02 55);
+  --border:oklch(90% 0.013 75);
+  --coral:oklch(64% 0.15 35);
+  --coral-soft:oklch(93% 0.035 35);
+  --success:oklch(60% 0.12 150);
+  --success-soft:oklch(93% 0.035 150);
+}
+*{box-sizing:border-box;}
+body{margin:0;}
+.h{font-family:'Lora',Georgia,'Times New Roman',serif;}
+.b{font-family:'Manrope',system-ui,-apple-system,sans-serif;}
+.row{display:flex;align-items:center;}
+.step{display:flex;gap:12px;margin-bottom:16px;}
+.stepnum{width:24px;height:24px;border-radius:50%;background:var(--coral-soft);color:var(--coral);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+</style>
+</helmet>
+
+<div class="b" style="width:390px;height:844px;background:var(--bg);color:var(--text);overflow:hidden;position:relative;">
+  <div style="position:absolute;inset:0;overflow-y:auto;padding:24px 20px 40px;">
+
+    <div class="row" style="gap:10px;margin-bottom:22px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="h" style="font-size:20px;font-weight:600;">Correo del banco</div>
+    </div>
+
+    <div style="text-align:center;margin-bottom:22px;">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--coral-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--coral)" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="font-size:13.5px;color:var(--text-muted);line-height:1.5;padding:0 8px;">Reenvía los correos de "compra aprobada" de tu banco a esta dirección y te armamos el borrador del gasto automáticamente.</div>
+    </div>
+
+    <!-- Alias card -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:24px;">
+      <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Su dirección de reenvío</div>
+      <div class="row" style="justify-content:space-between;gap:10px;background:var(--bg);border-radius:10px;padding:12px 14px;">
+        <span style="font-size:13px;font-weight:600;word-break:break-all;">gonzalo-luciana-4f2a@gastos.dupla.app</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--coral)" stroke-width="1.8" style="flex-shrink:0;"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Cómo configurarlo</div>
+
+    <div class="step">
+      <div class="stepnum">1</div>
+      <div style="font-size:13.5px;line-height:1.5;">Entra a la configuración de reglas/filtros de tu correo (Gmail, Outlook, etc.).</div>
+    </div>
+    <div class="step">
+      <div class="stepnum">2</div>
+      <div style="font-size:13.5px;line-height:1.5;">Crea una regla: si el remitente es tu banco y el asunto contiene <b>"compra aprobada"</b>, reenviar a la dirección de arriba.</div>
+    </div>
+    <div class="step" style="margin-bottom:24px;">
+      <div class="stepnum">3</div>
+      <div style="font-size:13.5px;line-height:1.5;">Listo. Los próximos pagos con esa tarjeta (incluido Apple Pay) van a aparecer en <b>"Por confirmar"</b>.</div>
+    </div>
+
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px;">Bancos conectados</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:22px;">
+      <div class="row" style="padding:13px 14px;gap:12px;border-bottom:1px solid var(--border);">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;"></div>
+        <span style="flex:1;font-size:14px;font-weight:600;">Banco de Chile</span>
+        <span style="font-size:12px;color:var(--text-muted);">Gonzalo</span>
+      </div>
+      <div class="row" style="padding:13px 14px;gap:12px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;"></div>
+        <span style="flex:1;font-size:14px;font-weight:600;">Santander</span>
+        <span style="font-size:12px;color:var(--text-muted);">Luciana</span>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:var(--text-muted);text-align:center;line-height:1.5;">Esto no le da acceso a tu correo completo — solo recibimos lo que tú decides reenviar.</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

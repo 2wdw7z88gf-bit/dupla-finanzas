@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:oklch(97% 0.012 75);
+  --surface:oklch(99% 0.005 75);
+  --surface-2:oklch(95% 0.015 75);
+  --text:oklch(23% 0.02 55);
+  --text-muted:oklch(53% 0.02 55);
+  --border:oklch(90% 0.013 75);
+  --coral:oklch(64% 0.15 35);
+  --coral-soft:oklch(93% 0.035 35);
+  --teal:oklch(58% 0.10 196);
+  --teal-soft:oklch(93% 0.028 196);
+  --success:oklch(60% 0.12 150);
+  --indigo:oklch(56% 0.12 265);
+  --indigo-soft:oklch(93% 0.025 265);
+}
+*{box-sizing:border-box;}
+body{margin:0;}
+.h{font-family:'Lora',Georgia,'Times New Roman',serif;}
+.b{font-family:'Manrope',system-ui,-apple-system,sans-serif;}
+.row{display:flex;align-items:center;}
+.chip{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:999px;}
+.draft{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;}
+.btn{flex:1;text-align:center;font-weight:700;font-size:13px;border-radius:10px;padding:10px;}
+</style>
+</helmet>
+
+<div class="b" style="width:390px;height:844px;background:var(--bg);color:var(--text);overflow:hidden;position:relative;">
+  <div style="position:absolute;inset:0;overflow-y:auto;padding:24px 20px 40px;">
+
+    <div class="row" style="gap:10px;margin-bottom:8px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="h" style="font-size:22px;font-weight:600;">Por confirmar</div>
+    </div>
+    <div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;margin-bottom:20px;">Detectamos estos pagos en el correo del banco. Revisa la categoría y cómo se dividen antes de agregarlos.</div>
+
+    <!-- Draft 1 -->
+    <div class="draft">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14.5px;font-weight:700;">Starbucks Las Condes</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Tarjeta Gonzalo •••• 4821 · hoy 14:32</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;">$6.500</div>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:12px;">
+        <span class="chip" style="color:var(--coral);background:var(--coral-soft);">Comida ⌄</span>
+        <span class="chip" style="color:var(--text-muted);background:var(--surface-2);">Personal ⌄</span>
+      </div>
+      <div class="row" style="gap:10px;">
+        <div class="btn" style="border:1.5px solid var(--border);color:var(--text-muted);">Descartar</div>
+        <div class="btn" style="background:var(--success);color:var(--surface);">Confirmar</div>
+      </div>
+    </div>
+
+    <!-- Draft 2 -->
+    <div class="draft">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14.5px;font-weight:700;">Uber *Trip</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Tarjeta Luciana •••• 1190 · hoy 09:14</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;">$8.200</div>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:12px;">
+        <span class="chip" style="color:var(--teal);background:var(--teal-soft);">Transporte ⌄</span>
+        <span class="chip" style="color:var(--text-muted);background:var(--surface-2);">Personal ⌄</span>
+      </div>
+      <div class="row" style="gap:10px;">
+        <div class="btn" style="border:1.5px solid var(--border);color:var(--text-muted);">Descartar</div>
+        <div class="btn" style="background:var(--success);color:var(--surface);">Confirmar</div>
+      </div>
+    </div>
+
+    <!-- Draft 3 -->
+    <div class="draft" style="margin-bottom:22px;">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14.5px;font-weight:700;">PedidosYa</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Tarjeta Gonzalo •••• 4821 · ayer 21:05</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;">$15.300</div>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:12px;">
+        <span class="chip" style="color:var(--coral);background:var(--coral-soft);">Comida ⌄</span>
+        <span class="chip" style="color:var(--indigo);background:var(--indigo-soft);">50/50 ⌄</span>
+      </div>
+      <div class="row" style="gap:10px;">
+        <div class="btn" style="border:1.5px solid var(--border);color:var(--text-muted);">Descartar</div>
+        <div class="btn" style="background:var(--success);color:var(--surface);">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:center;gap:7px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01" stroke-linecap="round"/></svg>
+      <span style="font-size:12.5px;color:var(--text-muted);">¿Cómo funciona esto?</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

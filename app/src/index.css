@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-serif: "Lora", Georgia, "Times New Roman", serif;
+
+  --color-bg: oklch(97% 0.012 75);
+  --color-surface: oklch(99% 0.005 75);
+  --color-surface-2: oklch(95% 0.015 75);
+  --color-text: oklch(23% 0.02 55);
+  --color-text-muted: oklch(53% 0.02 55);
+  --color-border: oklch(90% 0.013 75);
+
+  --color-coral: oklch(64% 0.15 35);
+  --color-coral-dark: oklch(54% 0.16 32);
+  --color-coral-soft: oklch(93% 0.035 35);
+
+  --color-teal: oklch(58% 0.10 196);
+  --color-teal-soft: oklch(93% 0.028 196);
+
+  --color-success: oklch(60% 0.12 150);
+  --color-success-soft: oklch(93% 0.035 150);
+
+  --color-danger: oklch(56% 0.17 27);
+  --color-danger-soft: oklch(93% 0.045 27);
+
+  --color-amber: oklch(72% 0.13 70);
+  --color-amber-soft: oklch(93% 0.04 70);
+
+  --color-gold: oklch(70% 0.11 85);
+  --color-gold-soft: oklch(93% 0.03 85);
+
+  --color-indigo: oklch(56% 0.12 265);
+  --color-indigo-soft: oklch(93% 0.025 265);
+
+  --color-berry: oklch(56% 0.14 340);
+  --color-berry-soft: oklch(93% 0.035 340);
+
+  --color-violet: oklch(58% 0.13 300);
+  --color-violet-soft: oklch(93% 0.03 300);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-coral);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-coral-dark);
+}
