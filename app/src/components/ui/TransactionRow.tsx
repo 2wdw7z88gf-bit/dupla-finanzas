@@ -1,6 +1,7 @@
 import type { Category, Transaction } from '../../types'
-import { PEOPLE } from '../../data/mock'
+import { useMembers } from '../../hooks/useMembers'
 import { formatCLP, relativeDay } from '../../lib/format'
+import { memberById } from '../../lib/calc'
 import { CategoryIcon } from './CategoryIcon'
 import { SplitBadge } from './SplitBadge'
 
@@ -13,6 +14,7 @@ export function TransactionRow({
   category: Category
   showSplitBadge?: boolean
 }) {
+  const members = useMembers()
   const isIncome = category.type === 'ingreso'
   return (
     <div className="flex items-center gap-3 py-[11px] border-b border-border last:border-b-0">
@@ -21,7 +23,7 @@ export function TransactionRow({
         <div className="text-[14.5px] font-semibold truncate">{tx.description}</div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-xs text-text-muted truncate">
-            {category.name} · {PEOPLE[tx.paidBy].name}
+            {category.name} · {memberById(members, tx.paidBy).displayName}
           </span>
           {showSplitBadge && <SplitBadge split={tx.split} ratio={tx.splitRatio} />}
         </div>

@@ -3,12 +3,14 @@ import { useState } from 'react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { InfoIcon } from '../components/icons/Icons'
 import { useData } from '../state/DataContext'
-import { categoryById } from '../lib/calc'
+import { useMembers } from '../hooks/useMembers'
+import { categoryById, memberById } from '../lib/calc'
 import { formatCLP } from '../lib/format'
 import type { DraftTransaction, SplitType } from '../types'
 
 export function PorConfirmar() {
   const { draftTransactions, categories, confirmDraft, discardDraft } = useData()
+  const members = useMembers()
 
   return (
     <div>
@@ -22,7 +24,14 @@ export function PorConfirmar() {
       )}
 
       {draftTransactions.map((draft) => (
-        <DraftCard key={draft.id} draft={draft} categories={categories} onConfirm={confirmDraft} onDiscard={discardDraft} />
+        <DraftCard
+          key={draft.id}
+          draft={draft}
+          categories={categories}
+          members={members}
+          onConfirm={confirmDraft}
+          onDiscard={discardDraft}
+        />
       ))}
 
       <div className="flex items-center justify-center gap-1.5 mt-2">
@@ -38,15 +47,19 @@ export function PorConfirmar() {
 function DraftCard({
   draft,
   categories,
+  members,
   onConfirm,
   onDiscard,
 }: {
   draft: DraftTransaction
   categories: ReturnType<typeof useData>['categories']
+  members: ReturnType<typeof useMembers>
   onConfirm: (id: string, overrides?: Partial<{ categoryId: string; split: SplitType }>) => void
   onDiscard: (id: string) => void
 }) {
-  const [categoryId, setCategoryId] = useState(draft.suggestedCategoryId)
+  const [categoryId, setCategoryId] = useState(
+    draft.suggestedCategoryId ?? categories.find((c) => c.type === 'gasto')?.id ?? categories[0]?.id ?? '',
+  )
   const [split, setSplit] = useState<SplitType>(draft.suggestedSplit)
   const category = categoryById(categories, categoryId)
   const time = new Date(draft.detectedAt)
@@ -58,7 +71,7 @@ function DraftCard({
         <div>
           <div className="text-[14.5px] font-bold">{draft.merchant}</div>
           <div className="text-xs text-text-muted mt-0.5">
-            Tarjeta {draft.cardOwner === 'gonzalo' ? 'Gonzalo' : 'Luciana'} •••• {draft.cardLast4} ·{' '}
+            Tarjeta {memberById(members, draft.cardOwner).displayName} •••• {draft.cardLast4} ·{' '}
             {isToday ? 'hoy' : 'ayer'}{' '}
             {time.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
           </div>

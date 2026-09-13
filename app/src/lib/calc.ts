@@ -1,8 +1,12 @@
-import type { Account, Category, PersonId, Settlement, Transaction } from '../types'
+import type { Account, Category, HouseholdMember, Settlement, Transaction, UserId } from '../types'
 import { relativeDay } from './format'
 
-export function categoryById(categories: Category[], id: string): Category {
+export function categoryById(categories: Category[], id: string | null): Category {
   return categories.find((c) => c.id === id) ?? categories[0]
+}
+
+export function memberById(members: HouseholdMember[], id: UserId | null): HouseholdMember {
+  return members.find((m) => m.id === id) ?? { id: id ?? '', displayName: 'Compartido', color: 'coral' }
 }
 
 export function totalByType(transactions: Transaction[], categories: Category[], type: 'gasto' | 'ingreso'): number {
@@ -44,32 +48,46 @@ export function projectedAccountBalance(account: Account, asOf: Date = new Date(
   }
 }
 
+/** Given a 2-person household, returns whichever id in `members` is NOT `id`. */
+export function otherMember(members: UserId[], id: UserId): UserId | undefined {
+  return members.find((m) => m !== id)
+}
+
 /**
- * Nets out who owes whom across shared transactions and settlements.
- * Positive `net[personId]` means the household owes that person money.
+ * Nets out who owes whom across shared transactions and settlements, for a
+ * 2-person household. Positive `net[personId]` means the household owes
+ * that person money.
  */
 export function computeBalance(
   transactions: Transaction[],
   settlements: Settlement[],
-): { owes: PersonId; owedTo: PersonId; amount: number } | null {
-  const net: Record<PersonId, number> = { gonzalo: 0, luciana: 0 }
+  memberIds: UserId[],
+): { owes: UserId; owedTo: UserId; amount: number } | null {
+  if (memberIds.length < 2) return null
+  const net = new Map<UserId, number>(memberIds.map((id) => [id, 0]))
+  const bump = (id: UserId, delta: number) => net.set(id, (net.get(id) ?? 0) + delta)
 
   for (const t of transactions) {
     if (t.split === 'personal') continue
+    const other = otherMember(memberIds, t.paidBy)
+    if (!other) continue
     const otherShare = t.split === 'custom' && t.splitRatio ? t.splitRatio[1] : 0.5
-    const other: PersonId = t.paidBy === 'gonzalo' ? 'luciana' : 'gonzalo'
     const otherOwes = t.amount * otherShare
-    net[t.paidBy] += otherOwes
-    net[other] -= otherOwes
+    bump(t.paidBy, otherOwes)
+    bump(other, -otherOwes)
   }
 
   for (const s of settlements) {
-    net[s.from] += s.amount
-    net[s.to] -= s.amount
+    bump(s.from, s.amount)
+    bump(s.to, -s.amount)
   }
 
-  if (net.gonzalo > 0.5) return { owes: 'luciana', owedTo: 'gonzalo', amount: Math.round(net.gonzalo) }
-  if (net.luciana > 0.5) return { owes: 'gonzalo', owedTo: 'luciana', amount: Math.round(net.luciana) }
+  for (const [id, amount] of net) {
+    if (amount > 0.5) {
+      const other = otherMember(memberIds, id)
+      if (other) return { owes: other, owedTo: id, amount: Math.round(amount) }
+    }
+  }
   return null
 }
 

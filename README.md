@@ -6,13 +6,15 @@ ahorro con interés diario estimado, pagos fijos, una meta de ahorro con
 calculadora de crédito, y una bandeja de gastos detectados desde el correo
 del banco.
 
+**En línea:** https://dupla-finanzas-jh4x.vercel.app (se actualiza solo con cada push a `main`).
+
 ## Estructura
 
 - **`mockup/`** — el diseño visual (Claude Design canvas) usado para acordar cada pantalla antes de programar.
 - **`app/`** — la aplicación real: React + Vite + TypeScript + Tailwind CSS.
-- **`supabase/schema.sql`** — el esquema de base de datos (Postgres) para Supabase, con seguridad por fila (RLS) para que cada hogar solo vea sus propios datos.
+- **`supabase/`** — el esquema de base de datos (Postgres) para Supabase y sus migraciones, con seguridad por fila (RLS) para que solo ustedes dos vean sus datos.
 
-## Cómo correr la app
+## Cómo correr la app localmente
 
 ```bash
 cd app
@@ -20,22 +22,30 @@ npm install
 npm run dev
 ```
 
-Se abre en `http://localhost:5173`. **Por ahora corre en modo demo**, con
-datos de ejemplo en memoria (ver `src/data/mock.ts` y `src/state/DataContext.tsx`)
-— no hay backend conectado todavía, así que los cambios no se guardan al
-recargar la página.
+Se abre en `http://localhost:5173`.
 
-## Conectar la base de datos real (Supabase)
+## Base de datos (Supabase)
 
-1. Crea una cuenta gratis en [supabase.com](https://supabase.com) y un proyecto nuevo.
-2. En el proyecto, ve a **SQL Editor** → **New query**, pega el contenido de `supabase/schema.sql` y ejecútalo.
-3. En **Project Settings → API**, copia la **Project URL** y la **anon public key**.
-4. Dentro de `app/`, copia `.env.example` a `.env.local` y pega esos dos valores.
-5. Reinicia `npm run dev` — la app dejará de estar en modo demo.
+Ya está conectada. Los archivos en `supabase/` se corren **en orden**, uno
+por uno, en el **SQL Editor** de Supabase (New query → pegar → Run):
 
-(Este paso todavía no está hecho — el código ya está preparado para usarlo,
-pero las páginas siguen leyendo los datos de ejemplo mientras terminamos de
-conectar cada pantalla a Supabase.)
+1. `schema.sql` — todas las tablas.
+2. `002_bootstrap_household.sql` — función que crea el hogar la primera vez que alguien se registra, y une a la segunda persona al mismo hogar.
+3. `003_harden_functions.sql` — cierra permisos de esas funciones (recomendación del Security Advisor de Supabase).
+4. `004_recurring_instances_household.sql` — ajuste a la tabla de pagos fijos.
+5. `005_enable_realtime.sql` — **importante**: sin esto, los cambios de uno no se ven en vivo en la pantalla del otro (hay que recargar la página).
+6. `006_seed_categories.sql` — categorías de partida (Comida, Transporte, etc.). Se corre una sola vez.
+
+Sin credenciales en `app/.env.local` (ver `.env.example`), la app corre en
+**modo demo** con datos de ejemplo en memoria, útil para probar el diseño
+sin backend.
+
+## Estado actual / lo que falta
+
+- ✅ Login y registro reales, cada hogar ve solo lo suyo.
+- ✅ Movimientos, categorías, saldos, pagos fijos y "por confirmar" ya leen y escriben en Supabase, en vivo (Realtime) entre los dos.
+- ⏳ **Presupuestos, cuentas de ahorro y metas todavía no tienen una pantalla para crearlos/editarlos** — hoy se ven vacíos hasta que carguemos algo manualmente en la tabla o construyamos esas pantallas (próximo paso).
+- ⏳ La conexión con el correo del banco ("Por confirmar") es solo la interfaz; falta el parser de correos real.
 
 ## Stack
 
@@ -43,4 +53,5 @@ conectar cada pantalla a Supabase.)
 - Tailwind CSS v4 (tokens de diseño en `src/index.css`)
 - React Router
 - Recharts (gráficos de Reportes)
-- Supabase (Postgres + Auth), pendiente de conectar
+- Supabase (Postgres + Auth + Realtime)
+- Vercel (hosting)

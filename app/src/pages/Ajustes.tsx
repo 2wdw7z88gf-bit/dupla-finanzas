@@ -14,13 +14,14 @@ import {
   WalletIcon,
 } from '../components/icons/Icons'
 import { Avatar } from '../components/ui/Avatar'
-import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
 import { useAuth } from '../state/AuthContext'
+import { useMembers } from '../hooks/useMembers'
 
 export function Ajustes() {
   const { categories, accounts } = useData()
   const { signOut } = useAuth()
+  const members = useMembers()
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState(true)
   const [reconcileReminder, setReconcileReminder] = useState(true)
@@ -36,15 +37,14 @@ export function Ajustes() {
 
       <div className="flex items-center gap-3.5 bg-surface border border-border rounded-2xl p-4.5 mb-5">
         <div className="relative w-[52px] h-[42px] shrink-0">
-          <div className="absolute left-0 top-0">
-            <Avatar person={PEOPLE.gonzalo} size={36} />
-          </div>
-          <div className="absolute left-[18px] top-0 ring-2 ring-surface rounded-full">
-            <Avatar person={PEOPLE.luciana} size={36} />
-          </div>
+          {members.map((m, i) => (
+            <div key={m.id} className={i === 0 ? 'absolute left-0 top-0' : 'absolute left-[18px] top-0 ring-2 ring-surface rounded-full'}>
+              <Avatar person={m} size={36} />
+            </div>
+          ))}
         </div>
         <div className="flex-1">
-          <div className="text-[15px] font-bold">Gonzalo &amp; Luciana</div>
+          <div className="text-[15px] font-bold">{members.map((m) => m.displayName).join(' & ') || 'Tu hogar'}</div>
           <div className="text-[12.5px] text-text-muted">Espacio compartido</div>
         </div>
         <EditIcon size={16} className="text-text-muted" />
@@ -54,7 +54,7 @@ export function Ajustes() {
       <Group>
         <Row icon={<WalletIcon size={19} />} label="Moneda" value="CLP · Peso chileno" />
         <Row icon={<TargetIcon size={19} />} label="Categorías" value={`${categories.length} categorías`} to="/ajustes/categorias" />
-        <Row icon={<UsersIcon size={19} />} label="Miembros" value="2 personas" />
+        <Row icon={<UsersIcon size={19} />} label="Miembros" value={`${members.length} persona${members.length === 1 ? '' : 's'}`} />
         <Row
           icon={<TrendingUpIcon size={19} />}
           label="Cuentas de ahorro"

@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { PlaneIcon, RingsIcon, ShieldIcon, TrendingUpIcon } from '../components/icons/Icons'
 import { useData } from '../state/DataContext'
-import { PEOPLE, MONTHLY_SPENDING } from '../data/mock'
+import { MONTHLY_SPENDING } from '../data/mock'
+import { useMembers } from '../hooks/useMembers'
 import { categoryById, projectedAccountBalance, totalByType } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
 import { CATEGORY_CHART_COLOR, CHART } from '../lib/chartColors'
-import type { PersonId } from '../types'
 
 const GOAL_ICONS = { plane: PlaneIcon, shield: ShieldIcon, rings: RingsIcon }
 const GOAL_COLOR_CLASSES: Record<string, { bg: string; fg: string; bar: string }> = {
@@ -17,6 +17,7 @@ const GOAL_COLOR_CLASSES: Record<string, { bg: string; fg: string; bar: string }
 
 export function Reportes() {
   const { transactions, categories, accounts, savingsGoals } = useData()
+  const members = useMembers()
   const thisMonthSpent = totalByType(transactions, categories, 'gasto')
   const monthlyData = [...MONTHLY_SPENDING, { month: monthName().slice(0, 3), total: thisMonthSpent }]
 
@@ -29,12 +30,12 @@ export function Reportes() {
     .map(([categoryId, value]) => ({ categoryId, name: categoryById(categories, categoryId).name, value }))
     .sort((a, b) => b.value - a.value)
 
-  const totalsByPerson: Record<PersonId, number> = { gonzalo: 0, luciana: 0 }
+  const totalsByPerson = new Map<string, number>(members.map((m) => [m.id, 0]))
   for (const t of transactions) {
     if (categoryById(categories, t.categoryId).type !== 'gasto') continue
-    totalsByPerson[t.paidBy] += t.amount
+    totalsByPerson.set(t.paidBy, (totalsByPerson.get(t.paidBy) ?? 0) + t.amount)
   }
-  const maxPersonTotal = Math.max(totalsByPerson.gonzalo, totalsByPerson.luciana, 1)
+  const maxPersonTotal = Math.max(...totalsByPerson.values(), 1)
 
   const account = accounts[0]
   const projection = projectedAccountBalance(account)
@@ -100,17 +101,19 @@ export function Reportes() {
       </div>
 
       <div className="bg-surface border border-border rounded-2xl p-4.5 mb-3.5">
-        <div className="text-sm font-bold mb-4">Gonzalo vs. Luciana</div>
-        {(['luciana', 'gonzalo'] as PersonId[]).map((id) => (
-          <div key={id} className="mb-3 last:mb-0">
+        <div className="text-sm font-bold mb-4">
+          {members.map((m) => m.displayName).join(' vs. ') || 'Gasto por persona'}
+        </div>
+        {members.map((m) => (
+          <div key={m.id} className="mb-3 last:mb-0">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[13px] font-semibold">{PEOPLE[id].name}</span>
-              <span className="text-[13px] font-bold">{formatCLP(totalsByPerson[id])}</span>
+              <span className="text-[13px] font-semibold">{m.displayName}</span>
+              <span className="text-[13px] font-bold">{formatCLP(totalsByPerson.get(m.id) ?? 0)}</span>
             </div>
             <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${id === 'luciana' ? 'bg-coral' : 'bg-teal'}`}
-                style={{ width: `${(totalsByPerson[id] / maxPersonTotal) * 100}%` }}
+                className={`h-full rounded-full ${m.color === 'coral' ? 'bg-coral' : 'bg-teal'}`}
+                style={{ width: `${((totalsByPerson.get(m.id) ?? 0) / maxPersonTotal) * 100}%` }}
               />
             </div>
           </div>

@@ -2,16 +2,17 @@ import type {
   Account,
   Category,
   DraftTransaction,
-  Person,
+  HouseholdMember,
   RecurringPayment,
   SavingsGoal,
   Settlement,
   Transaction,
 } from '../types'
 
-export const PEOPLE: Record<string, Person> = {
-  gonzalo: { id: 'gonzalo', name: 'Gonzalo', initial: 'G', color: 'teal' },
-  luciana: { id: 'luciana', name: 'Luciana', initial: 'L', color: 'coral' },
+/** Demo-mode-only stand-ins for the two real household members. */
+export const PEOPLE: Record<string, HouseholdMember> = {
+  gonzalo: { id: 'gonzalo', displayName: 'Gonzalo', color: 'teal' },
+  luciana: { id: 'luciana', displayName: 'Luciana', color: 'coral' },
 }
 
 export const CATEGORIES: Category[] = [
@@ -46,11 +47,11 @@ export const ACCOUNTS: Account[] = [
 ]
 
 export const RECURRING_PAYMENTS: RecurringPayment[] = [
-  { id: 'r1', name: 'Crédito consumo', categoryId: 'hogar', amount: 120000, dueDay: 15, payer: 'compartido', paidThisMonth: false },
+  { id: 'r1', name: 'Crédito consumo', categoryId: 'hogar', amount: 120000, dueDay: 15, payer: null, paidThisMonth: false },
   { id: 'r2', name: 'Seguro auto', categoryId: 'transporte', amount: 45000, dueDay: 20, payer: 'gonzalo', paidThisMonth: false },
   { id: 'r3', name: 'Gimnasio', categoryId: 'salud', amount: 35000, dueDay: 10, payer: 'luciana', paidThisMonth: false },
   { id: 'r4', name: 'Crédito auto', categoryId: 'transporte', amount: 185000, dueDay: 5, payer: 'gonzalo', paidThisMonth: true, paidOn: '2026-09-05' },
-  { id: 'r5', name: 'Netflix', categoryId: 'ocio', amount: 9990, dueDay: 3, payer: 'compartido', paidThisMonth: true, paidOn: '2026-09-03' },
+  { id: 'r5', name: 'Netflix', categoryId: 'ocio', amount: 9990, dueDay: 3, payer: null, paidThisMonth: true, paidOn: '2026-09-03' },
   { id: 'r6', name: 'Plan celular', categoryId: 'hogar', amount: 18000, dueDay: 1, payer: 'luciana', paidThisMonth: true, paidOn: '2026-09-01' },
 ]
 

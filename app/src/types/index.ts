@@ -1,9 +1,9 @@
-export type PersonId = 'gonzalo' | 'luciana'
+/** A user's id (auth.users.id / household_members.user_id) — always a uuid once real data is wired. */
+export type UserId = string
 
-export interface Person {
-  id: PersonId
-  name: string
-  initial: string
+export interface HouseholdMember {
+  id: UserId
+  displayName: string
   color: 'coral' | 'teal'
 }
 
@@ -23,7 +23,7 @@ export interface Transaction {
   categoryId: string
   amount: number
   date: string // ISO date
-  paidBy: PersonId
+  paidBy: UserId
   split: SplitType
   splitRatio?: [number, number] // [paidBy share, other share], only for 'custom'
 }
@@ -47,7 +47,7 @@ export interface RecurringPayment {
   categoryId: string
   amount: number
   dueDay: number
-  payer: PersonId | 'compartido'
+  payer: UserId | null // null = compartido
   paidThisMonth: boolean
   paidOn?: string
 }
@@ -65,8 +65,8 @@ export interface SavingsGoal {
 
 export interface Settlement {
   id: string
-  from: PersonId
-  to: PersonId
+  from: UserId
+  to: UserId
   amount: number
   date: string
 }
@@ -75,9 +75,9 @@ export interface DraftTransaction {
   id: string
   merchant: string
   amount: number
-  cardOwner: PersonId
+  cardOwner: UserId
   cardLast4: string
   detectedAt: string
-  suggestedCategoryId: string
+  suggestedCategoryId: string | null
   suggestedSplit: SplitType
 }

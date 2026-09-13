@@ -12,23 +12,24 @@ import {
   RepeatIcon,
   ScaleIcon,
 } from '../components/icons/Icons'
-import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
-import { useAuth } from '../state/AuthContext'
-import { categoryById, categorySpent, computeBalance, projectedAccountBalance, recentTransactions, totalByType } from '../lib/calc'
+import { useMe, useMembers } from '../hooks/useMembers'
+import { categoryById, categorySpent, computeBalance, memberById, projectedAccountBalance, recentTransactions, totalByType } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
 
 export function Dashboard() {
   const { transactions, categories, budgets, accounts, recurringPayments, settlements, draftTransactions } = useData()
-  const { member } = useAuth()
-  const me = member
-    ? { id: 'me', name: member.displayName, initial: member.displayName.charAt(0).toUpperCase(), color: member.color }
-    : PEOPLE.luciana
+  const me = useMe()
+  const members = useMembers()
   const spent = totalByType(transactions, categories, 'gasto')
   const income = totalByType(transactions, categories, 'ingreso')
   const budgetTotal = budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
   const percent = Math.round((spent / budgetTotal) * 100)
-  const balance = computeBalance(transactions, settlements)
+  const balance = computeBalance(
+    transactions,
+    settlements,
+    members.map((m) => m.id),
+  )
   const account = accounts[0]
   const projection = projectedAccountBalance(account)
   const comidaSpent = categorySpent(transactions, 'comida')
@@ -39,7 +40,7 @@ export function Dashboard() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4.5">
-        <h1 className="font-serif text-[21px] font-semibold">Hola, {me.name}</h1>
+        <h1 className="font-serif text-[21px] font-semibold">Hola, {me.displayName}</h1>
         <Link to="/ajustes">
           <Avatar person={me} />
         </Link>
@@ -70,8 +71,8 @@ export function Dashboard() {
           </div>
           <div className="flex-1">
             <div className="text-sm leading-snug">
-              <b>{PEOPLE[balance.owes].name}</b> le debe <b>{formatCLP(balance.amount)}</b> a{' '}
-              <b>{PEOPLE[balance.owedTo].name}</b>
+              <b>{memberById(members, balance.owes).displayName}</b> le debe <b>{formatCLP(balance.amount)}</b> a{' '}
+              <b>{memberById(members, balance.owedTo).displayName}</b>
             </div>
             <div className="text-[12.5px] text-teal font-bold mt-0.5">Ver detalle →</div>
           </div>

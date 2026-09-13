@@ -1,22 +1,26 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Avatar } from '../components/ui/Avatar'
 import { ArrowRightIcon, SendIcon } from '../components/icons/Icons'
-import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
-import { computeBalance } from '../lib/calc'
+import { useMembers } from '../hooks/useMembers'
+import { computeBalance, memberById } from '../lib/calc'
 import { formatCLP, formatDate } from '../lib/format'
-import type { PersonId } from '../types'
 
 export function Saldos() {
   const { transactions, settlements, addSettlement } = useData()
+  const members = useMembers()
   const [registering, setRegistering] = useState(false)
-  const balance = computeBalance(transactions, settlements)
+  const balance = computeBalance(
+    transactions,
+    settlements,
+    members.map((m) => m.id),
+  )
 
   const shared = transactions.filter((t) => t.split !== 'personal')
-  const paidBy: Record<PersonId, number> = { gonzalo: 0, luciana: 0 }
-  for (const t of shared) paidBy[t.paidBy] += t.amount
-  const sharedTotal = paidBy.gonzalo + paidBy.luciana
-  const fairShare = sharedTotal / 2
+  const paidBy = new Map<string, number>(members.map((m) => [m.id, 0]))
+  for (const t of shared) paidBy.set(t.paidBy, (paidBy.get(t.paidBy) ?? 0) + t.amount)
+  const sharedTotal = [...paidBy.values()].reduce((a, b) => a + b, 0)
+  const fairShare = members.length ? sharedTotal / members.length : 0
 
   function handleRegisterPayment() {
     if (!balance) return
@@ -30,14 +34,17 @@ export function Saldos() {
 
       <div className="bg-surface border border-border rounded-2xl p-7 mb-4.5 text-center">
         <div className="flex items-center justify-center gap-4.5 mb-4">
-          <Avatar person={PEOPLE.gonzalo} size={52} />
-          <ArrowRightIcon size={26} className="text-text-muted" />
-          <Avatar person={PEOPLE.luciana} size={52} />
+          {members.map((m, i) => (
+            <Fragment key={m.id}>
+              <Avatar person={m} size={52} />
+              {i === 0 && members.length > 1 && <ArrowRightIcon size={26} className="text-text-muted" />}
+            </Fragment>
+          ))}
         </div>
         {balance ? (
           <>
             <div className="text-[13.5px] font-semibold text-text-muted">
-              {PEOPLE[balance.owes].name} le debe a {PEOPLE[balance.owedTo].name}
+              {memberById(members, balance.owes).displayName} le debe a {memberById(members, balance.owedTo).displayName}
             </div>
             <div className="font-serif text-[38px] font-bold my-1">{formatCLP(balance.amount)}</div>
           </>
@@ -60,19 +67,19 @@ export function Saldos() {
           <span className="text-sm font-bold">Gastos compartidos</span>
           <span className="text-[13px] text-text-muted">{formatCLP(sharedTotal)}</span>
         </div>
-        {(['luciana', 'gonzalo'] as PersonId[]).map((id) => (
-          <div key={id} className="mb-3.5 last:mb-0">
+        {members.map((m) => (
+          <div key={m.id} className="mb-3.5 last:mb-0">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
-                <Avatar person={PEOPLE[id]} size={18} />
-                <span className="text-[13px] font-semibold">{PEOPLE[id].name} puso</span>
+                <Avatar person={m} size={18} />
+                <span className="text-[13px] font-semibold">{m.displayName} puso</span>
               </div>
-              <span className="text-[13px] font-bold">{formatCLP(paidBy[id])}</span>
+              <span className="text-[13px] font-bold">{formatCLP(paidBy.get(m.id) ?? 0)}</span>
             </div>
             <div className="h-[7px] bg-surface-2 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${id === 'luciana' ? 'bg-coral' : 'bg-teal'}`}
-                style={{ width: sharedTotal ? `${(paidBy[id] / sharedTotal) * 100}%` : '0%' }}
+                className={`h-full rounded-full ${m.color === 'coral' ? 'bg-coral' : 'bg-teal'}`}
+                style={{ width: sharedTotal ? `${((paidBy.get(m.id) ?? 0) / sharedTotal) * 100}%` : '0%' }}
               />
             </div>
           </div>
@@ -84,20 +91,24 @@ export function Saldos() {
 
       <div className="text-base font-bold mb-3">Historial de pagos</div>
       {settlements.length === 0 && <p className="text-sm text-text-muted">Todavía no han registrado pagos entre ustedes.</p>}
-      {settlements.map((s) => (
-        <div key={s.id} className="flex items-center gap-3 py-3 border-b border-border last:border-b-0">
-          <div className={`w-[38px] h-[38px] rounded-full flex items-center justify-center ${s.from === 'gonzalo' ? 'bg-teal-soft' : 'bg-coral-soft'}`}>
-            <SendIcon size={16} className={s.from === 'gonzalo' ? 'text-teal' : 'text-coral'} />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-semibold">
-              {PEOPLE[s.from].name} transfirió a {PEOPLE[s.to].name}
+      {settlements.map((s) => {
+        const from = memberById(members, s.from)
+        const to = memberById(members, s.to)
+        return (
+          <div key={s.id} className="flex items-center gap-3 py-3 border-b border-border last:border-b-0">
+            <div className={`w-[38px] h-[38px] rounded-full flex items-center justify-center ${from.color === 'teal' ? 'bg-teal-soft' : 'bg-coral-soft'}`}>
+              <SendIcon size={16} className={from.color === 'teal' ? 'text-teal' : 'text-coral'} />
             </div>
-            <div className="text-xs text-text-muted">{formatDate(s.date)}</div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold">
+                {from.displayName} transfirió a {to.displayName}
+              </div>
+              <div className="text-xs text-text-muted">{formatDate(s.date)}</div>
+            </div>
+            <div className="text-sm font-bold">{formatCLP(s.amount)}</div>
           </div>
-          <div className="text-sm font-bold">{formatCLP(s.amount)}</div>
-        </div>
-      ))}
+        )
+      })}
 
       <p className="text-xs text-text-muted text-center mt-5 leading-relaxed">
         Los gastos marcados como compartidos se dividen 50/50, salvo que elijas otra proporción al crearlos.
@@ -108,8 +119,8 @@ export function Saldos() {
           <div className="absolute inset-0 bg-text/40" onClick={() => setRegistering(false)} />
           <div className="relative bg-surface rounded-2xl p-6 w-[320px] text-center">
             <p className="text-sm mb-4">
-              ¿Confirmas que <b>{PEOPLE[balance.owes].name}</b> le transfirió <b>{formatCLP(balance.amount)}</b> a{' '}
-              <b>{PEOPLE[balance.owedTo].name}</b>?
+              ¿Confirmas que <b>{memberById(members, balance.owes).displayName}</b> le transfirió{' '}
+              <b>{formatCLP(balance.amount)}</b> a <b>{memberById(members, balance.owedTo).displayName}</b>?
             </p>
             <div className="flex gap-2.5">
               <button

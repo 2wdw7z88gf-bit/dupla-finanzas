@@ -2,18 +2,20 @@ import { useState } from 'react'
 import { CategoryIcon } from './ui/CategoryIcon'
 import { CloseIcon } from './icons/Icons'
 import { Avatar } from './ui/Avatar'
-import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
-import type { PersonId, SplitType } from '../types'
+import { useMe, useMembers } from '../hooks/useMembers'
+import type { SplitType, UserId } from '../types'
 import { formatCLP } from '../lib/format'
 
 export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
   const { categories, addTransaction } = useData()
+  const me = useMe()
+  const members = useMembers()
   const [kind, setKind] = useState<'gasto' | 'ingreso'>('gasto')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [payer, setPayer] = useState<PersonId>('luciana')
+  const [payer, setPayer] = useState<UserId>(me.id)
   const [split, setSplit] = useState<SplitType>('50/50')
 
   const filteredCategories = categories.filter((c) => c.type === kind)
@@ -96,17 +98,17 @@ export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
 
         <div className="text-xs font-bold text-text-muted uppercase tracking-wide mb-2">¿Quién pagó?</div>
         <div className="flex gap-2.5 mb-4.5">
-          {(['luciana', 'gonzalo'] as PersonId[]).map((id) => (
+          {members.map((m) => (
             <button
-              key={id}
-              onClick={() => setPayer(id)}
+              key={m.id}
+              onClick={() => setPayer(m.id)}
               className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 border-[1.5px] ${
-                payer === id ? 'border-coral bg-coral-soft' : 'border-border'
+                payer === m.id ? 'border-coral bg-coral-soft' : 'border-border'
               }`}
             >
-              <Avatar person={PEOPLE[id]} size={22} />
-              <span className={`text-[13px] ${payer === id ? 'font-bold' : 'font-semibold text-text-muted'}`}>
-                {PEOPLE[id].name}
+              <Avatar person={m} size={22} />
+              <span className={`text-[13px] ${payer === m.id ? 'font-bold' : 'font-semibold text-text-muted'}`}>
+                {m.displayName}
               </span>
             </button>
           ))}

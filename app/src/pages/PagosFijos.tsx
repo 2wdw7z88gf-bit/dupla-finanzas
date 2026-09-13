@@ -2,14 +2,15 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { CategoryIcon } from '../components/ui/CategoryIcon'
 import { PlusIcon } from '../components/icons/Icons'
-import { PEOPLE } from '../data/mock'
 import { useData } from '../state/DataContext'
-import { categoryById } from '../lib/calc'
+import { useMembers } from '../hooks/useMembers'
+import { categoryById, memberById } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
 import type { RecurringPayment } from '../types'
 
 export function PagosFijos() {
   const { recurringPayments, categories, toggleRecurringPaid } = useData()
+  const members = useMembers()
   const pending = recurringPayments.filter((r) => !r.paidThisMonth)
   const paid = recurringPayments.filter((r) => r.paidThisMonth)
   const pendingTotal = pending.reduce((s, r) => s + r.amount, 0)
@@ -44,8 +45,8 @@ export function PagosFijos() {
         </div>
       </div>
 
-      <Group title="Pendientes" items={pending} categories={categories} onToggle={toggleRecurringPaid} />
-      <Group title="Pagados este mes" items={paid} categories={categories} onToggle={toggleRecurringPaid} muted />
+      <Group title="Pendientes" items={pending} categories={categories} members={members} onToggle={toggleRecurringPaid} />
+      <Group title="Pagados este mes" items={paid} categories={categories} members={members} onToggle={toggleRecurringPaid} muted />
 
       <button className="w-full border-[1.5px] border-dashed border-border text-text-muted font-bold text-[13.5px] rounded-2xl py-3.5 mt-4.5">
         + Nuevo pago fijo
@@ -58,12 +59,14 @@ function Group({
   title,
   items,
   categories,
+  members,
   onToggle,
   muted = false,
 }: {
   title: string
   items: RecurringPayment[]
   categories: ReturnType<typeof useData>['categories']
+  members: ReturnType<typeof useMembers>
   onToggle: (id: string) => void
   muted?: boolean
 }) {
@@ -74,7 +77,7 @@ function Group({
       <div className="bg-surface border border-border rounded-2xl overflow-hidden">
         {items.map((item) => {
           const category = categoryById(categories, item.categoryId)
-          const payerLabel = item.payer === 'compartido' ? 'Compartido' : PEOPLE[item.payer].name
+          const payerLabel = item.payer === null ? 'Compartido' : memberById(members, item.payer).displayName
           return (
             <button
               key={item.id}
