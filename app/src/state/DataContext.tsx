@@ -53,6 +53,13 @@ export interface PaymentDetails {
   split: SplitType
 }
 
+/** One person's contribution when confirming a pago fijo — usually one leg, or one per person when "cada uno paga su parte". */
+export interface PaymentLeg {
+  amount: number
+  paidBy: UserId
+  split: SplitType
+}
+
 interface DataContextValue {
   transactions: Transaction[]
   categories: Category[]
@@ -70,8 +77,8 @@ interface DataContextValue {
   addRecurringPayment: (r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) => void
   updateRecurringPayment: (id: string, patch: Partial<Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>>) => void
   deleteRecurringPayment: (id: string) => void
-  /** Marks a recurring payment paid for the current month AND creates the matching transaction. */
-  confirmRecurringPayment: (id: string, details: Omit<PaymentDetails, 'categoryId'>) => void
+  /** Marks a recurring payment paid for the current month AND creates the matching transaction(s) — one leg per person paying. */
+  confirmRecurringPayment: (id: string, date: string, legs: PaymentLeg[]) => void
   /** Undoes "paid" for the current month and removes the transaction it created. */
   undoRecurringPayment: (id: string) => void
   confirmDraft: (id: string, overrides?: Partial<Pick<Transaction, 'categoryId' | 'split'>>) => void
@@ -205,20 +212,32 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('recurring_payments').delete().eq('id', id)
   }
 
-  async function confirmRecurringPayment(id: string, details: Omit<PaymentDetails, 'categoryId'>) {
+  async function confirmRecurringPayment(id: string, date: string, legs: PaymentLeg[]) {
     if (!supabase || !householdId) return
     const rp = recurringRows.find((r) => r.id === id)
     if (!rp) return
-    const transactionId = await addTransaction({
-      description: rp.name,
-      categoryId: rp.category_id,
-      amount: details.amount,
-      date: details.date,
-      paidBy: details.paidBy,
-      split: details.split,
-    })
+    const txIds: (string | undefined)[] = []
+    for (const leg of legs) {
+      txIds.push(
+        await addTransaction({
+          description: rp.name,
+          categoryId: rp.category_id,
+          amount: leg.amount,
+          date,
+          paidBy: leg.paidBy,
+          split: leg.split,
+        }),
+      )
+    }
     await supabase.from('recurring_payment_instances').upsert(
-      { household_id: householdId, recurring_payment_id: id, period, paid_on: details.date, transaction_id: transactionId ?? null },
+      {
+        household_id: householdId,
+        recurring_payment_id: id,
+        period,
+        paid_on: date,
+        transaction_id: txIds[0] ?? null,
+        transaction_id_2: txIds[1] ?? null,
+      },
       { onConflict: 'recurring_payment_id,period' },
     )
   }
@@ -226,11 +245,12 @@ function RealDataProvider({ children }: { children: ReactNode }) {
   async function undoRecurringPayment(id: string) {
     if (!supabase || !householdId) return
     const existing = instanceRows.find((i) => i.recurring_payment_id === id && i.period === period)
-    if (existing?.transaction_id) {
-      await supabase.from('transactions').delete().eq('id', existing.transaction_id)
+    const linkedIds = [existing?.transaction_id, existing?.transaction_id_2].filter(Boolean) as string[]
+    if (linkedIds.length) {
+      await supabase.from('transactions').delete().in('id', linkedIds)
     }
     await supabase.from('recurring_payment_instances').upsert(
-      { household_id: householdId, recurring_payment_id: id, period, paid_on: null, transaction_id: null },
+      { household_id: householdId, recurring_payment_id: id, period, paid_on: null, transaction_id: null, transaction_id_2: null },
       { onConflict: 'recurring_payment_id,period' },
     )
   }
@@ -383,7 +403,7 @@ function MockDataProvider({ children }: { children: ReactNode }) {
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(SAVINGS_GOALS)
   const [debts, setDebts] = useState<Debt[]>(DEBTS)
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>(RECURRING_PAYMENTS)
-  const [recurringTxMap, setRecurringTxMap] = useState<Record<string, string>>({})
+  const [recurringTxMap, setRecurringTxMap] = useState<Record<string, string[]>>({})
   const [draftTransactions, setDraftTransactions] = useState<DraftTransaction[]>(DRAFT_TRANSACTIONS)
   const [settlements, setSettlements] = useState<Settlement[]>(SETTLEMENTS)
 
@@ -413,28 +433,28 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       updateRecurringPayment: (id, patch) =>
         setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))),
       deleteRecurringPayment: (id) => setRecurringPayments((prev) => prev.filter((r) => r.id !== id)),
-      confirmRecurringPayment: (id, details) => {
+      confirmRecurringPayment: (id, date, legs) => {
         const rp = recurringPayments.find((r) => r.id === id)
         if (!rp) return
-        const txId = crypto.randomUUID()
+        const txIds = legs.map(() => crypto.randomUUID())
         setTransactions((prev) => [
-          {
-            id: txId,
+          ...legs.map((leg, i) => ({
+            id: txIds[i],
             description: rp.name,
             categoryId: rp.categoryId,
-            amount: details.amount,
-            date: details.date,
-            paidBy: details.paidBy,
-            split: details.split,
-          },
+            amount: leg.amount,
+            date,
+            paidBy: leg.paidBy,
+            split: leg.split,
+          })),
           ...prev,
         ])
-        setRecurringTxMap((prev) => ({ ...prev, [id]: txId }))
-        setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, paidThisMonth: true, paidOn: details.date } : r)))
+        setRecurringTxMap((prev) => ({ ...prev, [id]: txIds }))
+        setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, paidThisMonth: true, paidOn: date } : r)))
       },
       undoRecurringPayment: (id) => {
-        const txId = recurringTxMap[id]
-        if (txId) setTransactions((prev) => prev.filter((t) => t.id !== txId))
+        const txIds = recurringTxMap[id]
+        if (txIds?.length) setTransactions((prev) => prev.filter((t) => !txIds.includes(t.id)))
         setRecurringTxMap((prev) => {
           const next = { ...prev }
           delete next[id]

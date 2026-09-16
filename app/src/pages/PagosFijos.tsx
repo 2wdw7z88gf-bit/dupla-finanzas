@@ -4,7 +4,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { CategoryIcon } from '../components/ui/CategoryIcon'
 import { Avatar } from '../components/ui/Avatar'
 import { CloseIcon, CreditCardIcon, EditIcon, PlusIcon } from '../components/icons/Icons'
-import { useData, type PaymentDetails } from '../state/DataContext'
+import { useData, type PaymentDetails, type PaymentLeg } from '../state/DataContext'
 import { useMe, useMembers } from '../hooks/useMembers'
 import { categoryById, memberById } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
@@ -199,7 +199,7 @@ export function PagosFijos() {
       {payingRecurring && (
         <ConfirmPaymentSheet
           item={payingRecurring}
-          onSave={(details) => confirmRecurringPayment(payingRecurring.id, details)}
+          onSave={(date, legs) => confirmRecurringPayment(payingRecurring.id, date, legs)}
           onClose={() => setPayingRecurring(null)}
         />
       )}
@@ -327,18 +327,39 @@ function ConfirmPaymentSheet({
   onClose,
 }: {
   item: RecurringPayment
-  onSave: (details: Omit<PaymentDetails, 'categoryId'>) => void
+  onSave: (date: string, legs: PaymentLeg[]) => void
   onClose: () => void
 }) {
   const me = useMe()
+  const members = useMembers()
+  const [mode, setMode] = useState<'single' | 'each'>('single')
+
+  // "single" mode: one person pays, cost shared or not
   const [amount, setAmount] = useState(String(item.amount))
   const [payer, setPayer] = useState<UserId>(item.payer ?? me.id)
   const [split, setSplit] = useState<SplitType>(item.payer === null ? '50/50' : 'personal')
   const amountNumber = Number(amount.replace(/\D/g, '')) || 0
 
+  // "each" mode: everyone pays their own part directly
+  const [perMemberAmount, setPerMemberAmount] = useState<Record<string, string>>(() =>
+    Object.fromEntries(members.map((m) => [m.id, String(Math.round(item.amount / (members.length || 1)))])),
+  )
+  const perMemberNumbers = members.map((m) => Number((perMemberAmount[m.id] ?? '').replace(/\D/g, '')) || 0)
+  const eachTotal = perMemberNumbers.reduce((s, n) => s + n, 0)
+
+  const canSave = mode === 'single' ? amountNumber > 0 : eachTotal > 0
+
   function handleSave() {
-    if (amountNumber <= 0) return
-    onSave({ amount: amountNumber, date: new Date().toISOString().slice(0, 10), paidBy: payer, split })
+    if (!canSave) return
+    const date = new Date().toISOString().slice(0, 10)
+    if (mode === 'single') {
+      onSave(date, [{ amount: amountNumber, paidBy: payer, split }])
+    } else {
+      const legs: PaymentLeg[] = members
+        .map((m, i) => ({ amount: perMemberNumbers[i], paidBy: m.id, split: 'personal' as SplitType }))
+        .filter((leg) => leg.amount > 0)
+      onSave(date, legs)
+    }
     onClose()
   }
 
@@ -356,13 +377,55 @@ function ConfirmPaymentSheet({
         <div className="text-xs text-text-muted mb-4">
           Esto agrega {item.name} como movimiento de hoy y descuenta del presupuesto de su categoría.
         </div>
-        <Field label="Monto">
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" className={inputCls} />
-        </Field>
-        <PayerAndSplit payer={payer} onPayer={setPayer} split={split} onSplit={setSplit} />
+
+        <div className="flex bg-surface-2 rounded-xl p-1 mb-4.5">
+          <button
+            onClick={() => setMode('single')}
+            className={`flex-1 text-center text-[12.5px] font-bold py-2.5 rounded-[9px] ${mode === 'single' ? 'bg-surface shadow-sm text-text' : 'text-text-muted'}`}
+          >
+            Uno paga todo
+          </button>
+          <button
+            onClick={() => setMode('each')}
+            className={`flex-1 text-center text-[12.5px] font-bold py-2.5 rounded-[9px] ${mode === 'each' ? 'bg-surface shadow-sm text-text' : 'text-text-muted'}`}
+          >
+            Cada uno su parte
+          </button>
+        </div>
+
+        {mode === 'single' ? (
+          <>
+            <Field label="Monto">
+              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" className={inputCls} />
+            </Field>
+            <PayerAndSplit payer={payer} onPayer={setPayer} split={split} onSplit={setSplit} />
+          </>
+        ) : (
+          <Field label="Cuánto pone cada uno">
+            <div className="flex flex-col gap-2.5">
+              {members.map((m) => (
+                <div key={m.id} className="flex items-center gap-2.5">
+                  <Avatar person={m} size={26} />
+                  <span className="text-[13px] font-semibold w-16 shrink-0">{m.displayName}</span>
+                  <input
+                    value={perMemberAmount[m.id] ?? ''}
+                    onChange={(e) => setPerMemberAmount((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                    inputMode="numeric"
+                    placeholder="$0"
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-text-muted mt-2.5">
+              Total: <b className="text-text">{formatCLP(eachTotal)}</b> · esto crea un movimiento personal para cada uno
+            </div>
+          </Field>
+        )}
+
         <button
           onClick={handleSave}
-          disabled={amountNumber <= 0}
+          disabled={!canSave}
           className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
         >
           Confirmar pago
