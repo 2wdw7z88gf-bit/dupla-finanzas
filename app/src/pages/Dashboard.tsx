@@ -23,6 +23,7 @@ export function Dashboard() {
   const members = useMembers()
   const spent = totalByType(transactions, categories, 'gasto')
   const income = totalByType(transactions, categories, 'ingreso')
+  const netThisMonth = income - spent
   const budgetTotal = budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
   const percent = budgetTotal ? Math.round((spent / budgetTotal) * 100) : 0
   const balance = computeBalance(
@@ -112,7 +113,7 @@ export function Dashboard() {
         </Link>
       )}
 
-      <div className="flex gap-3 mb-5.5">
+      <div className="flex gap-3 mb-3.5">
         <div className="flex-1 bg-success-soft rounded-2xl px-4 py-3.5">
           <div className="text-xs font-semibold text-text-muted">Ingresos</div>
           <div className="font-serif text-lg font-bold mt-0.5">{formatCLP(income)}</div>
@@ -121,6 +122,14 @@ export function Dashboard() {
           <div className="text-xs font-semibold text-text-muted">Gastos</div>
           <div className="font-serif text-lg font-bold mt-0.5">{formatCLP(spent)}</div>
         </div>
+      </div>
+
+      <div className="flex items-center justify-between bg-surface border border-border rounded-2xl px-4.5 py-4 mb-5.5">
+        <span className="text-[13px] font-semibold text-text-muted">Disponible este mes</span>
+        <span className={`font-serif text-xl font-bold ${netThisMonth >= 0 ? 'text-success' : 'text-danger'}`}>
+          {netThisMonth < 0 ? '-' : ''}
+          {formatCLP(Math.abs(netThisMonth))}
+        </span>
       </div>
 
       {(tightestBudget || (account && projection)) && (
