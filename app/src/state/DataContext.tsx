@@ -26,6 +26,7 @@ import {
   mapSavingsGoal,
   mapSettlement,
   mapTransaction,
+  recurringPaymentToRow,
   savingsGoalToRow,
   settlementToRow,
   transactionToRow,
@@ -56,6 +57,9 @@ interface DataContextValue {
   updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void
   deleteTransaction: (id: string) => void
   addCategory: (cat: Omit<Category, 'id'>) => void
+  addRecurringPayment: (r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) => void
+  updateRecurringPayment: (id: string, patch: Partial<Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>>) => void
+  deleteRecurringPayment: (id: string) => void
   toggleRecurringPaid: (id: string) => void
   confirmDraft: (id: string, overrides?: Partial<Pick<Transaction, 'categoryId' | 'split'>>) => void
   discardDraft: (id: string) => void
@@ -162,6 +166,27 @@ function RealDataProvider({ children }: { children: ReactNode }) {
   async function addCategory(cat: Omit<Category, 'id'>) {
     if (!supabase || !householdId) return
     await supabase.from('categories').insert(categoryToRow(householdId, cat))
+  }
+
+  async function addRecurringPayment(r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) {
+    if (!supabase || !householdId) return
+    await supabase.from('recurring_payments').insert(recurringPaymentToRow(householdId, r))
+  }
+
+  async function updateRecurringPayment(id: string, patch: Partial<Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>>) {
+    if (!supabase) return
+    const row: Record<string, unknown> = {}
+    if (patch.name !== undefined) row.name = patch.name
+    if (patch.categoryId !== undefined) row.category_id = patch.categoryId
+    if (patch.amount !== undefined) row.amount = patch.amount
+    if (patch.dueDay !== undefined) row.due_day = patch.dueDay
+    if (patch.payer !== undefined) row.payer = patch.payer
+    await supabase.from('recurring_payments').update(row).eq('id', id)
+  }
+
+  async function deleteRecurringPayment(id: string) {
+    if (!supabase) return
+    await supabase.from('recurring_payments').delete().eq('id', id)
   }
 
   async function toggleRecurringPaid(id: string) {
@@ -283,6 +308,9 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     updateTransaction,
     deleteTransaction,
     addCategory,
+    addRecurringPayment,
+    updateRecurringPayment,
+    deleteRecurringPayment,
     toggleRecurringPaid,
     confirmDraft,
     discardDraft,
@@ -332,6 +360,11 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       updateTransaction: (id, patch) => setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))),
       deleteTransaction: (id) => setTransactions((prev) => prev.filter((t) => t.id !== id)),
       addCategory: (cat) => setCategories((prev) => [...prev, { ...cat, id: crypto.randomUUID() }]),
+      addRecurringPayment: (r) =>
+        setRecurringPayments((prev) => [...prev, { ...r, id: crypto.randomUUID(), paidThisMonth: false }]),
+      updateRecurringPayment: (id, patch) =>
+        setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))),
+      deleteRecurringPayment: (id) => setRecurringPayments((prev) => prev.filter((r) => r.id !== id)),
       toggleRecurringPaid: (id) =>
         setRecurringPayments((prev) =>
           prev.map((r) =>

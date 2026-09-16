@@ -75,6 +75,17 @@ export function mapRecurringPayment(row: any): Omit<RecurringPayment, 'paidThisM
   }
 }
 
+export function recurringPaymentToRow(householdId: string, r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) {
+  return {
+    household_id: householdId,
+    name: r.name,
+    category_id: r.categoryId,
+    amount: r.amount,
+    due_day: r.dueDay,
+    payer: r.payer,
+  }
+}
+
 export function mapSavingsGoal(row: any): SavingsGoal {
   return {
     id: row.id,
