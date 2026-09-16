@@ -15,7 +15,7 @@ export function PagosFijos() {
   const paid = recurringPayments.filter((r) => r.paidThisMonth)
   const pendingTotal = pending.reduce((s, r) => s + r.amount, 0)
   const paidTotal = paid.reduce((s, r) => s + r.amount, 0)
-  const pct = Math.round((paid.length / recurringPayments.length) * 100)
+  const pct = recurringPayments.length ? Math.round((paid.length / recurringPayments.length) * 100) : 0
 
   return (
     <div>

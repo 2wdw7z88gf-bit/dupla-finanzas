@@ -24,18 +24,22 @@ export function Dashboard() {
   const spent = totalByType(transactions, categories, 'gasto')
   const income = totalByType(transactions, categories, 'ingreso')
   const budgetTotal = budgets.reduce((sum, b) => sum + b.monthlyLimit, 0)
-  const percent = Math.round((spent / budgetTotal) * 100)
+  const percent = budgetTotal ? Math.round((spent / budgetTotal) * 100) : 0
   const balance = computeBalance(
     transactions,
     settlements,
     members.map((m) => m.id),
   )
   const account = accounts[0]
-  const projection = projectedAccountBalance(account)
-  const comidaSpent = categorySpent(transactions, 'comida')
-  const comidaBudget = budgets.find((b) => b.categoryId === 'comida')!.monthlyLimit
+  const projection = account ? projectedAccountBalance(account) : null
   const pendingRecurring = recurringPayments.filter((r) => !r.paidThisMonth)
   const recurringPending = pendingRecurring.reduce((s, r) => s + r.amount, 0)
+
+  // "Para ustedes": whichever budget is closest to (or over) its limit, plus the savings account's daily interest — only shown once there's real data to base them on.
+  const tightestBudget = budgets
+    .map((b) => ({ ...b, category: categoryById(categories, b.categoryId), spent: categorySpent(transactions, b.categoryId) }))
+    .filter((b) => b.monthlyLimit > 0)
+    .sort((a, b) => b.spent / b.monthlyLimit - a.spent / a.monthlyLimit)[0]
 
   return (
     <div>
@@ -92,19 +96,21 @@ export function Dashboard() {
         </Link>
       )}
 
-      <Link to="/pagos-fijos" className="flex items-center gap-3.5 bg-surface border border-border rounded-2xl px-4.5 py-4 mb-3.5">
-        <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center shrink-0">
-          <RepeatIcon size={19} />
-        </div>
-        <div className="flex-1">
-          <div className="text-sm font-bold">Pagos fijos de {monthName().split(' ')[0]}</div>
-          <div className="text-[12.5px] text-text-muted mt-0.5">
-            {recurringPayments.length - pendingRecurring.length} de {recurringPayments.length} pagados ·{' '}
-            {formatCLP(recurringPending)} pendientes
+      {recurringPayments.length > 0 && (
+        <Link to="/pagos-fijos" className="flex items-center gap-3.5 bg-surface border border-border rounded-2xl px-4.5 py-4 mb-3.5">
+          <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center shrink-0">
+            <RepeatIcon size={19} />
           </div>
-        </div>
-        <ChevronRightIcon size={16} className="text-text-muted" />
-      </Link>
+          <div className="flex-1">
+            <div className="text-sm font-bold">Pagos fijos de {monthName().split(' ')[0]}</div>
+            <div className="text-[12.5px] text-text-muted mt-0.5">
+              {recurringPayments.length - pendingRecurring.length} de {recurringPayments.length} pagados ·{' '}
+              {formatCLP(recurringPending)} pendientes
+            </div>
+          </div>
+          <ChevronRightIcon size={16} className="text-text-muted" />
+        </Link>
+      )}
 
       <div className="flex gap-3 mb-5.5">
         <div className="flex-1 bg-success-soft rounded-2xl px-4 py-3.5">
@@ -117,28 +123,37 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
-        <LightbulbIcon size={18} />
-        <span className="text-base font-bold">Para ustedes</span>
-      </div>
-      <div className="flex gap-3 overflow-x-auto mb-6 pb-0.5 -mx-5 px-5">
-        <div className="shrink-0 w-[250px] bg-amber-soft rounded-2xl p-4">
-          <div className="text-[13px] font-bold leading-snug">
-            Comida va en {Math.round((comidaSpent / comidaBudget) * 100)}% del presupuesto
+      {(tightestBudget || (account && projection)) && (
+        <>
+          <div className="flex items-center gap-2 mb-3">
+            <LightbulbIcon size={18} />
+            <span className="text-base font-bold">Para ustedes</span>
           </div>
-          <div className="text-xs text-text-muted mt-1.5 leading-snug">
-            Llevan {formatCLP(comidaSpent)} de {formatCLP(comidaBudget)} este mes.
+          <div className="flex gap-3 overflow-x-auto mb-6 pb-0.5 -mx-5 px-5">
+            {tightestBudget && (
+              <div className="shrink-0 w-[250px] bg-amber-soft rounded-2xl p-4">
+                <div className="text-[13px] font-bold leading-snug">
+                  {tightestBudget.category.name} va en {Math.round((tightestBudget.spent / tightestBudget.monthlyLimit) * 100)}% del
+                  presupuesto
+                </div>
+                <div className="text-xs text-text-muted mt-1.5 leading-snug">
+                  Llevan {formatCLP(tightestBudget.spent)} de {formatCLP(tightestBudget.monthlyLimit)} este mes.
+                </div>
+              </div>
+            )}
+            {account && projection && (
+              <div className="shrink-0 w-[250px] bg-teal-soft rounded-2xl p-4">
+                <div className="text-[13px] font-bold leading-snug">
+                  Su ahorro en {account.name} rinde ≈{formatCLP(projection.dailyEstimate)}/día
+                </div>
+                <div className="text-xs text-text-muted mt-1.5 leading-snug">
+                  En un año, a esta tasa, ganarían cerca de {formatCLP(projection.dailyEstimate * 365)} en intereses.
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="shrink-0 w-[250px] bg-teal-soft rounded-2xl p-4">
-          <div className="text-[13px] font-bold leading-snug">
-            Su ahorro en {account.name} rinde ≈{formatCLP(projection.dailyEstimate)}/día
-          </div>
-          <div className="text-xs text-text-muted mt-1.5 leading-snug">
-            En un año, a esta tasa, ganarían cerca de {formatCLP(projection.dailyEstimate * 365)} en intereses.
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <span className="text-base font-bold">Últimos movimientos</span>
