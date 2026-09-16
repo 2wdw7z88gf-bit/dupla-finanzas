@@ -182,8 +182,18 @@ function RealDataProvider({ children }: { children: ReactNode }) {
 
   async function deleteTransaction(id: string): Promise<string | undefined> {
     if (!supabase) return undefined
+    const linkedInstance = instanceRows.find((i) => i.transaction_id === id || i.transaction_id_2 === id)
     const { error } = await supabase.from('transactions').delete().eq('id', id)
-    return error?.message
+    if (error) return error.message
+    if (linkedInstance) {
+      // The movimiento that "confirmar pago" created is gone — put the pago fijo back to pendiente
+      // instead of leaving it checked off with no transaction behind it.
+      await supabase
+        .from('recurring_payment_instances')
+        .update({ paid_on: null, transaction_id: null, transaction_id_2: null })
+        .eq('id', linkedInstance.id)
+    }
+    return undefined
   }
 
   async function addCategory(cat: Omit<Category, 'id'>) {
@@ -425,6 +435,17 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       updateTransaction: (id, patch) => setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))),
       deleteTransaction: async (id) => {
         setTransactions((prev) => prev.filter((t) => t.id !== id))
+        const linkedRecurringId = Object.entries(recurringTxMap).find(([, txIds]) => txIds.includes(id))?.[0]
+        if (linkedRecurringId) {
+          setRecurringTxMap((prev) => {
+            const next = { ...prev }
+            delete next[linkedRecurringId]
+            return next
+          })
+          setRecurringPayments((prev) =>
+            prev.map((r) => (r.id === linkedRecurringId ? { ...r, paidThisMonth: false, paidOn: undefined } : r)),
+          )
+        }
         return undefined
       },
       addCategory: (cat) => setCategories((prev) => [...prev, { ...cat, id: crypto.randomUUID() }]),
