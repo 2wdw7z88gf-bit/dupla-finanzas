@@ -18,7 +18,7 @@ import { categoryById, categorySpent, computeBalance, memberById, projectedAccou
 import { formatCLP, monthName } from '../lib/format'
 
 export function Dashboard() {
-  const { transactions, categories, budgets, accounts, recurringPayments, settlements, draftTransactions } = useData()
+  const { transactions, categories, budgets, accounts, recurringPayments, settlements, draftTransactions, debts } = useData()
   const me = useMe()
   const members = useMembers()
   const spent = totalByType(transactions, categories, 'gasto')
@@ -34,7 +34,6 @@ export function Dashboard() {
   const account = accounts[0]
   const projection = account ? projectedAccountBalance(account) : null
   const pendingRecurring = recurringPayments.filter((r) => !r.paidThisMonth)
-  const recurringPending = pendingRecurring.reduce((s, r) => s + r.amount, 0)
 
   // "Para ustedes": whichever budget is closest to (or over) its limit, plus the savings account's daily interest — only shown once there's real data to base them on.
   const tightestBudget = budgets
@@ -97,21 +96,26 @@ export function Dashboard() {
         </Link>
       )}
 
-      {recurringPayments.length > 0 && (
-        <Link to="/pagos-fijos" className="flex items-center gap-3.5 bg-surface border border-border rounded-2xl px-4.5 py-4 mb-3.5">
-          <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center shrink-0">
-            <RepeatIcon size={19} />
+      <Link to="/pagos-fijos" className="flex items-center gap-3.5 bg-surface border border-border rounded-2xl px-4.5 py-4 mb-3.5">
+        <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center shrink-0">
+          <RepeatIcon size={19} />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-bold">Pagos fijos y deudas</div>
+          <div className="text-[12.5px] text-text-muted mt-0.5">
+            {recurringPayments.length > 0 || debts.length > 0
+              ? [
+                  recurringPayments.length > 0 &&
+                    `${recurringPayments.length - pendingRecurring.length} de ${recurringPayments.length} pagados`,
+                  debts.length > 0 && `deben ${formatCLP(debts.reduce((s, d) => s + d.remainingAmount, 0))}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Agreguen sus pagos mensuales o deudas'}
           </div>
-          <div className="flex-1">
-            <div className="text-sm font-bold">Pagos fijos de {monthName().split(' ')[0]}</div>
-            <div className="text-[12.5px] text-text-muted mt-0.5">
-              {recurringPayments.length - pendingRecurring.length} de {recurringPayments.length} pagados ·{' '}
-              {formatCLP(recurringPending)} pendientes
-            </div>
-          </div>
-          <ChevronRightIcon size={16} className="text-text-muted" />
-        </Link>
-      )}
+        </div>
+        <ChevronRightIcon size={16} className="text-text-muted" />
+      </Link>
 
       <div className="flex gap-3 mb-3.5">
         <div className="flex-1 bg-success-soft rounded-2xl px-4 py-3.5">
