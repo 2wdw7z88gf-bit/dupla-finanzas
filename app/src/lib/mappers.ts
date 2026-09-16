@@ -1,7 +1,7 @@
 // Supabase returns Postgres `numeric` columns as strings (they don't fit safely
 // in a JS number type-wise), so every money/rate column needs an explicit
 // Number(...) on the way in.
-import type { Account, Budget, Category, DraftTransaction, RecurringPayment, SavingsGoal, Settlement, Transaction } from '../types'
+import type { Account, Budget, Category, Debt, DraftTransaction, RecurringPayment, SavingsGoal, Settlement, Transaction } from '../types'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -109,6 +109,30 @@ export function mapSettlement(row: any): Settlement {
 
 export function settlementToRow(householdId: string, s: Omit<Settlement, 'id'>) {
   return { household_id: householdId, from_user: s.from, to_user: s.to, amount: s.amount, date: s.date }
+}
+
+export function mapDebt(row: any): Debt {
+  return {
+    id: row.id,
+    name: row.name,
+    creditor: row.creditor ?? undefined,
+    originalAmount: row.original_amount == null ? undefined : num(row.original_amount),
+    remainingAmount: num(row.remaining_amount),
+    monthlyPayment: row.monthly_payment == null ? undefined : num(row.monthly_payment),
+    dueDay: row.due_day ?? undefined,
+  }
+}
+
+export function debtToRow(householdId: string, debt: Omit<Debt, 'id'>) {
+  return {
+    household_id: householdId,
+    name: debt.name,
+    creditor: debt.creditor ?? null,
+    original_amount: debt.originalAmount ?? null,
+    remaining_amount: debt.remainingAmount,
+    monthly_payment: debt.monthlyPayment ?? null,
+    due_day: debt.dueDay ?? null,
+  }
 }
 
 export function mapDraftTransaction(row: any): DraftTransaction {

@@ -65,6 +65,16 @@ export interface SavingsGoal {
   accountId?: string
 }
 
+export interface Debt {
+  id: string
+  name: string
+  creditor?: string // free text: a bank, a person outside the household, etc.
+  originalAmount?: number
+  remainingAmount: number
+  monthlyPayment?: number
+  dueDay?: number
+}
+
 export interface Settlement {
   id: string
   from: UserId

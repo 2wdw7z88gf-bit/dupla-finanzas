@@ -3,6 +3,7 @@ import {
   ACCOUNTS,
   BUDGETS,
   CATEGORIES,
+  DEBTS,
   DRAFT_TRANSACTIONS,
   RECURRING_PAYMENTS,
   SAVINGS_GOALS,
@@ -15,9 +16,11 @@ import { useRealtimeTable } from '../hooks/useRealtimeTable'
 import {
   accountToRow,
   categoryToRow,
+  debtToRow,
   mapAccount,
   mapBudget,
   mapCategory,
+  mapDebt,
   mapDraftTransaction,
   mapRecurringPayment,
   mapSavingsGoal,
@@ -31,6 +34,7 @@ import type {
   Account,
   Budget,
   Category,
+  Debt,
   DraftTransaction,
   RecurringPayment,
   SavingsGoal,
@@ -61,6 +65,11 @@ interface DataContextValue {
   reconcileAccount: (id: string, balance: number) => void
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => void
   updateSavingsGoal: (id: string, patch: Partial<Omit<SavingsGoal, 'id'>>) => void
+  debts: Debt[]
+  addDebt: (debt: Omit<Debt, 'id'>) => void
+  updateDebt: (id: string, patch: Partial<Omit<Debt, 'id'>>) => void
+  deleteDebt: (id: string) => void
+  registerDebtPayment: (id: string, amount: number) => void
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -103,6 +112,7 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     column: 'detected_at',
     ascending: false,
   })
+  const { rows: debtRows } = useRealtimeTable<any>('debts', householdId, (r) => r.id)
 
   const categories = useMemo(() => categoryRows.map(mapCategory), [categoryRows])
   const transactions = useMemo(() => transactionRows.map(mapTransaction), [transactionRows])
@@ -114,6 +124,7 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     () => draftRows.filter((r) => r.status === 'pending').map(mapDraftTransaction),
     [draftRows],
   )
+  const debts = useMemo(() => debtRows.map(mapDebt), [debtRows])
 
   const recurringPayments = useMemo<RecurringPayment[]>(
     () =>
@@ -231,6 +242,34 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('savings_goals').update(row).eq('id', id)
   }
 
+  async function addDebt(debt: Omit<Debt, 'id'>) {
+    if (!supabase || !householdId) return
+    await supabase.from('debts').insert(debtToRow(householdId, debt))
+  }
+
+  async function updateDebt(id: string, patch: Partial<Omit<Debt, 'id'>>) {
+    if (!supabase) return
+    const row: Record<string, unknown> = {}
+    if (patch.name !== undefined) row.name = patch.name
+    if (patch.creditor !== undefined) row.creditor = patch.creditor ?? null
+    if (patch.originalAmount !== undefined) row.original_amount = patch.originalAmount ?? null
+    if (patch.remainingAmount !== undefined) row.remaining_amount = patch.remainingAmount
+    if (patch.monthlyPayment !== undefined) row.monthly_payment = patch.monthlyPayment ?? null
+    if (patch.dueDay !== undefined) row.due_day = patch.dueDay ?? null
+    await supabase.from('debts').update(row).eq('id', id)
+  }
+
+  async function deleteDebt(id: string) {
+    if (!supabase) return
+    await supabase.from('debts').delete().eq('id', id)
+  }
+
+  async function registerDebtPayment(id: string, amount: number) {
+    const debt = debts.find((d) => d.id === id)
+    if (!debt) return
+    await updateDebt(id, { remainingAmount: Math.max(0, debt.remainingAmount - amount) })
+  }
+
   const value: DataContextValue = {
     transactions,
     categories,
@@ -253,6 +292,11 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     reconcileAccount,
     addSavingsGoal,
     updateSavingsGoal,
+    debts,
+    addDebt,
+    updateDebt,
+    deleteDebt,
+    registerDebtPayment,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
@@ -269,6 +313,7 @@ function MockDataProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>(BUDGETS)
   const [accounts, setAccounts] = useState<Account[]>(ACCOUNTS)
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(SAVINGS_GOALS)
+  const [debts, setDebts] = useState<Debt[]>(DEBTS)
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>(RECURRING_PAYMENTS)
   const [draftTransactions, setDraftTransactions] = useState<DraftTransaction[]>(DRAFT_TRANSACTIONS)
   const [settlements, setSettlements] = useState<Settlement[]>(SETTLEMENTS)
@@ -327,8 +372,14 @@ function MockDataProvider({ children }: { children: ReactNode }) {
         ),
       addSavingsGoal: (goal) => setSavingsGoals((prev) => [...prev, { ...goal, id: crypto.randomUUID() }]),
       updateSavingsGoal: (id, patch) => setSavingsGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
+      debts,
+      addDebt: (debt) => setDebts((prev) => [...prev, { ...debt, id: crypto.randomUUID() }]),
+      updateDebt: (id, patch) => setDebts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d))),
+      deleteDebt: (id) => setDebts((prev) => prev.filter((d) => d.id !== id)),
+      registerDebtPayment: (id, amount) =>
+        setDebts((prev) => prev.map((d) => (d.id === id ? { ...d, remainingAmount: Math.max(0, d.remainingAmount - amount) } : d))),
     }),
-    [transactions, categories, budgets, accounts, savingsGoals, recurringPayments, draftTransactions, settlements],
+    [transactions, categories, budgets, accounts, savingsGoals, debts, recurringPayments, draftTransactions, settlements],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

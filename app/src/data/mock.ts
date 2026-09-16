@@ -1,6 +1,7 @@
 import type {
   Account,
   Category,
+  Debt,
   DraftTransaction,
   HouseholdMember,
   RecurringPayment,
@@ -53,6 +54,11 @@ export const RECURRING_PAYMENTS: RecurringPayment[] = [
   { id: 'r4', name: 'Crédito auto', categoryId: 'transporte', amount: 185000, dueDay: 5, payer: 'gonzalo', paidThisMonth: true, paidOn: '2026-09-05' },
   { id: 'r5', name: 'Netflix', categoryId: 'ocio', amount: 9990, dueDay: 3, payer: null, paidThisMonth: true, paidOn: '2026-09-03' },
   { id: 'r6', name: 'Plan celular', categoryId: 'hogar', amount: 18000, dueDay: 1, payer: 'luciana', paidThisMonth: true, paidOn: '2026-09-01' },
+]
+
+export const DEBTS: Debt[] = [
+  { id: 'd1', name: 'Tarjeta Falabella', creditor: 'Banco Falabella', originalAmount: 900000, remainingAmount: 620000, monthlyPayment: 80000, dueDay: 12 },
+  { id: 'd2', name: 'Préstamo mudanza', creditor: 'Mamá de Gonzalo', remainingAmount: 150000, monthlyPayment: 50000 },
 ]
 
 export const SAVINGS_GOALS: SavingsGoal[] = [
