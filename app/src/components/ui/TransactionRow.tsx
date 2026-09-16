@@ -9,15 +9,21 @@ export function TransactionRow({
   tx,
   category,
   showSplitBadge = false,
+  onClick,
 }: {
   tx: Transaction
   category: Category
   showSplitBadge?: boolean
+  onClick?: () => void
 }) {
   const members = useMembers()
   const isIncome = category.type === 'ingreso'
+  const Wrapper = onClick ? 'button' : 'div'
   return (
-    <div className="flex items-center gap-3 py-[11px] border-b border-border last:border-b-0">
+    <Wrapper
+      onClick={onClick}
+      className={`flex items-center gap-3 py-[11px] border-b border-border last:border-b-0 w-full text-left ${onClick ? 'active:bg-surface-2' : ''}`}
+    >
       <CategoryIcon category={category} />
       <div className="flex-1 min-w-0">
         <div className="text-[14.5px] font-semibold truncate">{tx.description}</div>
@@ -35,6 +41,6 @@ export function TransactionRow({
         </div>
         <div className="text-[11.5px] text-text-muted">{relativeDay(tx.date)}</div>
       </div>
-    </div>
+    </Wrapper>
   )
 }

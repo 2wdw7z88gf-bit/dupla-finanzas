@@ -7,11 +7,13 @@ import { AddTransactionSheet } from '../components/AddTransactionSheet'
 import { useData } from '../state/DataContext'
 import { categoryById, groupTransactionsByDay } from '../lib/calc'
 import { monthName } from '../lib/format'
+import type { Transaction } from '../types'
 
 export function Movimientos() {
   const { transactions, categories } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
   const [adding, setAdding] = useState(searchParams.has('add'))
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
 
   function openAdd() {
     setAdding(true)
@@ -54,7 +56,13 @@ export function Movimientos() {
           <div className="text-xs font-bold text-text-muted uppercase tracking-wide mb-2">{group.label}</div>
           <div>
             {group.items.map((tx) => (
-              <TransactionRow key={tx.id} tx={tx} category={categoryById(categories, tx.categoryId)} showSplitBadge />
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                category={categoryById(categories, tx.categoryId)}
+                showSplitBadge
+                onClick={() => setEditingTx(tx)}
+              />
             ))}
           </div>
         </div>
@@ -68,6 +76,7 @@ export function Movimientos() {
       </button>
 
       {adding && <AddTransactionSheet onClose={closeAdd} />}
+      {editingTx && <AddTransactionSheet existingTransaction={editingTx} onClose={() => setEditingTx(null)} />}
     </div>
   )
 }

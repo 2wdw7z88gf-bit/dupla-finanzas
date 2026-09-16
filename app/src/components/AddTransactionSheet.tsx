@@ -4,19 +4,30 @@ import { CloseIcon } from './icons/Icons'
 import { Avatar } from './ui/Avatar'
 import { useData } from '../state/DataContext'
 import { useMe, useMembers } from '../hooks/useMembers'
-import type { SplitType, UserId } from '../types'
+import type { SplitType, Transaction, UserId } from '../types'
 import { formatCLP } from '../lib/format'
 
-export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
-  const { categories, addTransaction } = useData()
+export function AddTransactionSheet({
+  onClose,
+  existingTransaction,
+}: {
+  onClose: () => void
+  existingTransaction?: Transaction
+}) {
+  const { categories, addTransaction, updateTransaction, deleteTransaction } = useData()
   const me = useMe()
   const members = useMembers()
-  const [kind, setKind] = useState<'gasto' | 'ingreso'>('gasto')
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [payer, setPayer] = useState<UserId>(me.id)
-  const [split, setSplit] = useState<SplitType>('50/50')
+  const isEditing = Boolean(existingTransaction)
+
+  const [kind, setKind] = useState<'gasto' | 'ingreso'>(() => {
+    if (!existingTransaction) return 'gasto'
+    return categories.find((c) => c.id === existingTransaction.categoryId)?.type ?? 'gasto'
+  })
+  const [description, setDescription] = useState(existingTransaction?.description ?? '')
+  const [amount, setAmount] = useState(existingTransaction ? String(existingTransaction.amount) : '')
+  const [categoryId, setCategoryId] = useState<string | null>(existingTransaction?.categoryId ?? null)
+  const [payer, setPayer] = useState<UserId>(existingTransaction?.paidBy ?? me.id)
+  const [split, setSplit] = useState<SplitType>(existingTransaction?.split ?? '50/50')
 
   const filteredCategories = categories.filter((c) => c.type === kind)
   const selectedCategory = categoryId ?? filteredCategories[0]?.id
@@ -25,14 +36,24 @@ export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
 
   function handleSave() {
     if (!canSave) return
-    addTransaction({
+    const payload = {
       description: description.trim(),
       categoryId: selectedCategory,
       amount: amountNumber,
-      date: new Date().toISOString().slice(0, 10),
       paidBy: payer,
       split,
-    })
+    }
+    if (existingTransaction) {
+      updateTransaction(existingTransaction.id, payload)
+    } else {
+      addTransaction({ ...payload, date: new Date().toISOString().slice(0, 10) })
+    }
+    onClose()
+  }
+
+  function handleDelete() {
+    if (!existingTransaction) return
+    deleteTransaction(existingTransaction.id)
     onClose()
   }
 
@@ -42,7 +63,7 @@ export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
       <div className="relative w-full md:max-w-md bg-surface rounded-t-3xl md:rounded-3xl px-5 pt-3.5 pb-7 max-h-[88vh] overflow-y-auto">
         <div className="w-9 h-1 bg-border rounded-full mx-auto mb-4 md:hidden" />
         <div className="flex items-center justify-between mb-4.5">
-          <h2 className="font-serif text-lg font-semibold">Nuevo movimiento</h2>
+          <h2 className="font-serif text-lg font-semibold">{isEditing ? 'Editar movimiento' : 'Nuevo movimiento'}</h2>
           <button onClick={onClose} aria-label="Cerrar">
             <CloseIcon size={18} />
           </button>
@@ -140,8 +161,14 @@ export function AddTransactionSheet({ onClose }: { onClose: () => void }) {
           disabled={!canSave}
           className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
         >
-          Guardar movimiento
+          {isEditing ? 'Guardar cambios' : 'Guardar movimiento'}
         </button>
+
+        {isEditing && (
+          <button onClick={handleDelete} className="w-full text-danger font-bold text-[13.5px] py-3.5">
+            Eliminar movimiento
+          </button>
+        )}
       </div>
     </div>
   )

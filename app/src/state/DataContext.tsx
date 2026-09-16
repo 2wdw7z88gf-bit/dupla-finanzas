@@ -49,6 +49,8 @@ interface DataContextValue {
   settlements: Settlement[]
   draftTransactions: DraftTransaction[]
   addTransaction: (tx: Omit<Transaction, 'id'>) => void
+  updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void
+  deleteTransaction: (id: string) => void
   addCategory: (cat: Omit<Category, 'id'>) => void
   toggleRecurringPaid: (id: string) => void
   confirmDraft: (id: string, overrides?: Partial<Pick<Transaction, 'categoryId' | 'split'>>) => void
@@ -126,6 +128,24 @@ function RealDataProvider({ children }: { children: ReactNode }) {
   async function addTransaction(tx: Omit<Transaction, 'id'>) {
     if (!supabase || !householdId) return
     await supabase.from('transactions').insert(transactionToRow(householdId, tx))
+  }
+
+  async function updateTransaction(id: string, patch: Partial<Omit<Transaction, 'id'>>) {
+    if (!supabase) return
+    const row: Record<string, unknown> = {}
+    if (patch.description !== undefined) row.description = patch.description
+    if (patch.categoryId !== undefined) row.category_id = patch.categoryId
+    if (patch.amount !== undefined) row.amount = patch.amount
+    if (patch.date !== undefined) row.date = patch.date
+    if (patch.paidBy !== undefined) row.paid_by = patch.paidBy
+    if (patch.split !== undefined) row.split = patch.split
+    if (patch.splitRatio !== undefined) row.split_ratio = patch.split === 'custom' && patch.splitRatio ? patch.splitRatio[0] : null
+    await supabase.from('transactions').update(row).eq('id', id)
+  }
+
+  async function deleteTransaction(id: string) {
+    if (!supabase) return
+    await supabase.from('transactions').delete().eq('id', id)
   }
 
   async function addCategory(cat: Omit<Category, 'id'>) {
@@ -221,6 +241,8 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     settlements,
     draftTransactions,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     addCategory,
     toggleRecurringPaid,
     confirmDraft,
@@ -262,6 +284,8 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       settlements,
       draftTransactions,
       addTransaction: (tx) => setTransactions((prev) => [{ ...tx, id: crypto.randomUUID() }, ...prev]),
+      updateTransaction: (id, patch) => setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))),
+      deleteTransaction: (id) => setTransactions((prev) => prev.filter((t) => t.id !== id)),
       addCategory: (cat) => setCategories((prev) => [...prev, { ...cat, id: crypto.randomUUID() }]),
       toggleRecurringPaid: (id) =>
         setRecurringPayments((prev) =>
