@@ -69,6 +69,7 @@ export interface Debt {
   id: string
   name: string
   creditor?: string // free text: a bank, a person outside the household, etc.
+  categoryId?: string // used to categorize the transaction a payment generates
   originalAmount?: number
   remainingAmount: number
   monthlyPayment?: number

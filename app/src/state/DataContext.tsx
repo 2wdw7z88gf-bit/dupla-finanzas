@@ -42,7 +42,16 @@ import type {
   Settlement,
   SplitType,
   Transaction,
+  UserId,
 } from '../types'
+
+export interface PaymentDetails {
+  amount: number
+  date: string
+  categoryId: string
+  paidBy: UserId
+  split: SplitType
+}
 
 interface DataContextValue {
   transactions: Transaction[]
@@ -53,14 +62,17 @@ interface DataContextValue {
   savingsGoals: SavingsGoal[]
   settlements: Settlement[]
   draftTransactions: DraftTransaction[]
-  addTransaction: (tx: Omit<Transaction, 'id'>) => void
+  addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<string | undefined>
   updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void
   deleteTransaction: (id: string) => void
   addCategory: (cat: Omit<Category, 'id'>) => void
   addRecurringPayment: (r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) => void
   updateRecurringPayment: (id: string, patch: Partial<Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>>) => void
   deleteRecurringPayment: (id: string) => void
-  toggleRecurringPaid: (id: string) => void
+  /** Marks a recurring payment paid for the current month AND creates the matching transaction. */
+  confirmRecurringPayment: (id: string, details: Omit<PaymentDetails, 'categoryId'>) => void
+  /** Undoes "paid" for the current month and removes the transaction it created. */
+  undoRecurringPayment: (id: string) => void
   confirmDraft: (id: string, overrides?: Partial<Pick<Transaction, 'categoryId' | 'split'>>) => void
   discardDraft: (id: string) => void
   addSettlement: (settlement: Omit<Settlement, 'id'>) => void
@@ -73,7 +85,8 @@ interface DataContextValue {
   addDebt: (debt: Omit<Debt, 'id'>) => void
   updateDebt: (id: string, patch: Partial<Omit<Debt, 'id'>>) => void
   deleteDebt: (id: string) => void
-  registerDebtPayment: (id: string, amount: number) => void
+  /** Registers a payment against a debt: creates the matching transaction and reduces the balance owed. */
+  registerDebtPayment: (id: string, details: PaymentDetails) => void
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -140,9 +153,10 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     [recurringRows, instanceRows, period],
   )
 
-  async function addTransaction(tx: Omit<Transaction, 'id'>) {
-    if (!supabase || !householdId) return
-    await supabase.from('transactions').insert(transactionToRow(householdId, tx))
+  async function addTransaction(tx: Omit<Transaction, 'id'>): Promise<string | undefined> {
+    if (!supabase || !householdId) return undefined
+    const { data } = await supabase.from('transactions').insert(transactionToRow(householdId, tx)).select('id').single()
+    return data?.id
   }
 
   async function updateTransaction(id: string, patch: Partial<Omit<Transaction, 'id'>>) {
@@ -189,17 +203,32 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('recurring_payments').delete().eq('id', id)
   }
 
-  async function toggleRecurringPaid(id: string) {
+  async function confirmRecurringPayment(id: string, details: Omit<PaymentDetails, 'categoryId'>) {
+    if (!supabase || !householdId) return
+    const rp = recurringRows.find((r) => r.id === id)
+    if (!rp) return
+    const transactionId = await addTransaction({
+      description: rp.name,
+      categoryId: rp.category_id,
+      amount: details.amount,
+      date: details.date,
+      paidBy: details.paidBy,
+      split: details.split,
+    })
+    await supabase.from('recurring_payment_instances').upsert(
+      { household_id: householdId, recurring_payment_id: id, period, paid_on: details.date, transaction_id: transactionId ?? null },
+      { onConflict: 'recurring_payment_id,period' },
+    )
+  }
+
+  async function undoRecurringPayment(id: string) {
     if (!supabase || !householdId) return
     const existing = instanceRows.find((i) => i.recurring_payment_id === id && i.period === period)
-    const nowPaid = !existing?.paid_on
+    if (existing?.transaction_id) {
+      await supabase.from('transactions').delete().eq('id', existing.transaction_id)
+    }
     await supabase.from('recurring_payment_instances').upsert(
-      {
-        household_id: householdId,
-        recurring_payment_id: id,
-        period,
-        paid_on: nowPaid ? new Date().toISOString().slice(0, 10) : null,
-      },
+      { household_id: householdId, recurring_payment_id: id, period, paid_on: null, transaction_id: null },
       { onConflict: 'recurring_payment_id,period' },
     )
   }
@@ -289,10 +318,18 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('debts').delete().eq('id', id)
   }
 
-  async function registerDebtPayment(id: string, amount: number) {
+  async function registerDebtPayment(id: string, details: PaymentDetails) {
     const debt = debts.find((d) => d.id === id)
     if (!debt) return
-    await updateDebt(id, { remainingAmount: Math.max(0, debt.remainingAmount - amount) })
+    await addTransaction({
+      description: `Pago ${debt.name}`,
+      categoryId: details.categoryId,
+      amount: details.amount,
+      date: details.date,
+      paidBy: details.paidBy,
+      split: details.split,
+    })
+    await updateDebt(id, { remainingAmount: Math.max(0, debt.remainingAmount - details.amount) })
   }
 
   const value: DataContextValue = {
@@ -311,7 +348,8 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     addRecurringPayment,
     updateRecurringPayment,
     deleteRecurringPayment,
-    toggleRecurringPaid,
+    confirmRecurringPayment,
+    undoRecurringPayment,
     confirmDraft,
     discardDraft,
     addSettlement,
@@ -343,6 +381,7 @@ function MockDataProvider({ children }: { children: ReactNode }) {
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(SAVINGS_GOALS)
   const [debts, setDebts] = useState<Debt[]>(DEBTS)
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>(RECURRING_PAYMENTS)
+  const [recurringTxMap, setRecurringTxMap] = useState<Record<string, string>>({})
   const [draftTransactions, setDraftTransactions] = useState<DraftTransaction[]>(DRAFT_TRANSACTIONS)
   const [settlements, setSettlements] = useState<Settlement[]>(SETTLEMENTS)
 
@@ -356,7 +395,11 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       savingsGoals,
       settlements,
       draftTransactions,
-      addTransaction: (tx) => setTransactions((prev) => [{ ...tx, id: crypto.randomUUID() }, ...prev]),
+      addTransaction: async (tx) => {
+        const id = crypto.randomUUID()
+        setTransactions((prev) => [{ ...tx, id }, ...prev])
+        return id
+      },
       updateTransaction: (id, patch) => setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))),
       deleteTransaction: (id) => setTransactions((prev) => prev.filter((t) => t.id !== id)),
       addCategory: (cat) => setCategories((prev) => [...prev, { ...cat, id: crypto.randomUUID() }]),
@@ -365,14 +408,35 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       updateRecurringPayment: (id, patch) =>
         setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))),
       deleteRecurringPayment: (id) => setRecurringPayments((prev) => prev.filter((r) => r.id !== id)),
-      toggleRecurringPaid: (id) =>
-        setRecurringPayments((prev) =>
-          prev.map((r) =>
-            r.id === id
-              ? { ...r, paidThisMonth: !r.paidThisMonth, paidOn: !r.paidThisMonth ? new Date().toISOString() : undefined }
-              : r,
-          ),
-        ),
+      confirmRecurringPayment: (id, details) => {
+        const rp = recurringPayments.find((r) => r.id === id)
+        if (!rp) return
+        const txId = crypto.randomUUID()
+        setTransactions((prev) => [
+          {
+            id: txId,
+            description: rp.name,
+            categoryId: rp.categoryId,
+            amount: details.amount,
+            date: details.date,
+            paidBy: details.paidBy,
+            split: details.split,
+          },
+          ...prev,
+        ])
+        setRecurringTxMap((prev) => ({ ...prev, [id]: txId }))
+        setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, paidThisMonth: true, paidOn: details.date } : r)))
+      },
+      undoRecurringPayment: (id) => {
+        const txId = recurringTxMap[id]
+        if (txId) setTransactions((prev) => prev.filter((t) => t.id !== txId))
+        setRecurringTxMap((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        setRecurringPayments((prev) => prev.map((r) => (r.id === id ? { ...r, paidThisMonth: false, paidOn: undefined } : r)))
+      },
       confirmDraft: (id, overrides) => {
         const draft = draftTransactions.find((d) => d.id === id)
         if (!draft) return
@@ -409,10 +473,27 @@ function MockDataProvider({ children }: { children: ReactNode }) {
       addDebt: (debt) => setDebts((prev) => [...prev, { ...debt, id: crypto.randomUUID() }]),
       updateDebt: (id, patch) => setDebts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d))),
       deleteDebt: (id) => setDebts((prev) => prev.filter((d) => d.id !== id)),
-      registerDebtPayment: (id, amount) =>
-        setDebts((prev) => prev.map((d) => (d.id === id ? { ...d, remainingAmount: Math.max(0, d.remainingAmount - amount) } : d))),
+      registerDebtPayment: (id, details) => {
+        const debt = debts.find((d) => d.id === id)
+        if (!debt) return
+        setTransactions((prev) => [
+          {
+            id: crypto.randomUUID(),
+            description: `Pago ${debt.name}`,
+            categoryId: details.categoryId,
+            amount: details.amount,
+            date: details.date,
+            paidBy: details.paidBy,
+            split: details.split,
+          },
+          ...prev,
+        ])
+        setDebts((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, remainingAmount: Math.max(0, d.remainingAmount - details.amount) } : d)),
+        )
+      },
     }),
-    [transactions, categories, budgets, accounts, savingsGoals, debts, recurringPayments, draftTransactions, settlements],
+    [transactions, categories, budgets, accounts, savingsGoals, debts, recurringPayments, recurringTxMap, draftTransactions, settlements],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

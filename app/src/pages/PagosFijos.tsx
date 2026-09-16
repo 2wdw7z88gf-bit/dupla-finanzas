@@ -4,20 +4,21 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { CategoryIcon } from '../components/ui/CategoryIcon'
 import { Avatar } from '../components/ui/Avatar'
 import { CloseIcon, CreditCardIcon, EditIcon, PlusIcon } from '../components/icons/Icons'
-import { useData } from '../state/DataContext'
-import { useMembers } from '../hooks/useMembers'
+import { useData, type PaymentDetails } from '../state/DataContext'
+import { useMe, useMembers } from '../hooks/useMembers'
 import { categoryById, memberById } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
-import type { Debt, RecurringPayment, UserId } from '../types'
+import type { Debt, RecurringPayment, SplitType, UserId } from '../types'
 
 export function PagosFijos() {
   const {
     recurringPayments,
     categories,
-    toggleRecurringPaid,
     addRecurringPayment,
     updateRecurringPayment,
     deleteRecurringPayment,
+    confirmRecurringPayment,
+    undoRecurringPayment,
     debts,
     addDebt,
     updateDebt,
@@ -37,6 +38,7 @@ export function PagosFijos() {
   const [payingDebt, setPayingDebt] = useState<Debt | null>(null)
   const [addingRecurring, setAddingRecurring] = useState(false)
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null)
+  const [payingRecurring, setPayingRecurring] = useState<RecurringPayment | null>(null)
 
   return (
     <div>
@@ -74,7 +76,7 @@ export function PagosFijos() {
         items={pending}
         categories={categories}
         members={members}
-        onToggle={toggleRecurringPaid}
+        onCheck={setPayingRecurring}
         onEdit={setEditingRecurring}
       />
       <Group
@@ -82,7 +84,7 @@ export function PagosFijos() {
         items={paid}
         categories={categories}
         members={members}
-        onToggle={toggleRecurringPaid}
+        onCheck={(item) => undoRecurringPayment(item.id)}
         onEdit={setEditingRecurring}
         muted
       />
@@ -157,9 +159,10 @@ export function PagosFijos() {
         + Nueva deuda
       </button>
 
-      {addingDebt && <DebtSheet onSave={addDebt} onClose={() => setAddingDebt(false)} />}
+      {addingDebt && <DebtSheet categories={categories} onSave={addDebt} onClose={() => setAddingDebt(false)} />}
       {editingDebt && (
         <DebtSheet
+          categories={categories}
           existingDebt={editingDebt}
           onSave={(patch) => updateDebt(editingDebt.id, patch)}
           onDelete={() => {
@@ -170,7 +173,12 @@ export function PagosFijos() {
         />
       )}
       {payingDebt && (
-        <PayDebtSheet debt={payingDebt} onSave={(amount) => registerDebtPayment(payingDebt.id, amount)} onClose={() => setPayingDebt(null)} />
+        <PayDebtSheet
+          debt={payingDebt}
+          categories={categories}
+          onSave={(details) => registerDebtPayment(payingDebt.id, details)}
+          onClose={() => setPayingDebt(null)}
+        />
       )}
 
       {addingRecurring && (
@@ -188,6 +196,13 @@ export function PagosFijos() {
           onClose={() => setEditingRecurring(null)}
         />
       )}
+      {payingRecurring && (
+        <ConfirmPaymentSheet
+          item={payingRecurring}
+          onSave={(details) => confirmRecurringPayment(payingRecurring.id, details)}
+          onClose={() => setPayingRecurring(null)}
+        />
+      )}
     </div>
   )
 }
@@ -197,7 +212,7 @@ function Group({
   items,
   categories,
   members,
-  onToggle,
+  onCheck,
   onEdit,
   muted = false,
 }: {
@@ -205,7 +220,7 @@ function Group({
   items: RecurringPayment[]
   categories: ReturnType<typeof useData>['categories']
   members: ReturnType<typeof useMembers>
-  onToggle: (id: string) => void
+  onCheck: (item: RecurringPayment) => void
   onEdit: (item: RecurringPayment) => void
   muted?: boolean
 }) {
@@ -230,7 +245,7 @@ function Group({
               <button onClick={() => onEdit(item)} aria-label="Editar pago fijo" className="shrink-0">
                 <EditIcon size={14} className="text-text-muted" />
               </button>
-              <button onClick={() => onToggle(item.id)} aria-label="Marcar pagado" className="shrink-0">
+              <button onClick={() => onCheck(item)} aria-label="Marcar pagado" className="shrink-0">
                 {item.paidThisMonth ? (
                   <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center">
                     <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="var(--color-surface)" strokeWidth={3}>
@@ -260,19 +275,120 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+/** Payer + split picker shared by the payment-confirmation sheets below. */
+function PayerAndSplit({
+  payer,
+  onPayer,
+  split,
+  onSplit,
+}: {
+  payer: UserId
+  onPayer: (id: UserId) => void
+  split: SplitType
+  onSplit: (s: SplitType) => void
+}) {
+  const members = useMembers()
+  return (
+    <>
+      <Field label="¿Quién pagó?">
+        <div className="flex gap-2.5">
+          {members.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => onPayer(m.id)}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 border-[1.5px] ${payer === m.id ? 'border-coral bg-coral-soft' : 'border-border'}`}
+            >
+              <Avatar person={m} size={20} />
+              <span className={`text-[13px] ${payer === m.id ? 'font-bold' : 'font-semibold text-text-muted'}`}>{m.displayName}</span>
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label="¿Cómo se divide?">
+        <div className="flex bg-surface-2 rounded-xl p-1">
+          {(['50/50', 'personal'] as SplitType[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => onSplit(s)}
+              className={`flex-1 text-center text-[13px] font-bold py-2.5 rounded-[9px] ${split === s ? 'bg-surface shadow-sm text-text' : 'text-text-muted'}`}
+            >
+              {s === '50/50' ? '50/50' : 'Personal'}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </>
+  )
+}
+
+function ConfirmPaymentSheet({
+  item,
+  onSave,
+  onClose,
+}: {
+  item: RecurringPayment
+  onSave: (details: Omit<PaymentDetails, 'categoryId'>) => void
+  onClose: () => void
+}) {
+  const me = useMe()
+  const [amount, setAmount] = useState(String(item.amount))
+  const [payer, setPayer] = useState<UserId>(item.payer ?? me.id)
+  const [split, setSplit] = useState<SplitType>(item.payer === null ? '50/50' : 'personal')
+  const amountNumber = Number(amount.replace(/\D/g, '')) || 0
+
+  function handleSave() {
+    if (amountNumber <= 0) return
+    onSave({ amount: amountNumber, date: new Date().toISOString().slice(0, 10), paidBy: payer, split })
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end md:items-center md:justify-center">
+      <div className="absolute inset-0 bg-text/40" onClick={onClose} />
+      <div className="relative w-full md:max-w-sm bg-surface rounded-t-3xl md:rounded-3xl px-5 pt-3.5 pb-7 max-h-[88vh] overflow-y-auto">
+        <div className="w-9 h-1 bg-border rounded-full mx-auto mb-4 md:hidden" />
+        <div className="flex items-center justify-between mb-4.5">
+          <h2 className="font-serif text-lg font-semibold">Confirmar pago</h2>
+          <button onClick={onClose}>
+            <CloseIcon size={18} />
+          </button>
+        </div>
+        <div className="text-xs text-text-muted mb-4">
+          Esto agrega {item.name} como movimiento de hoy y descuenta del presupuesto de su categoría.
+        </div>
+        <Field label="Monto">
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" className={inputCls} />
+        </Field>
+        <PayerAndSplit payer={payer} onPayer={setPayer} split={split} onSplit={setSplit} />
+        <button
+          onClick={handleSave}
+          disabled={amountNumber <= 0}
+          className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
+        >
+          Confirmar pago
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function DebtSheet({
+  categories,
   existingDebt,
   onSave,
   onDelete,
   onClose,
 }: {
+  categories: ReturnType<typeof useData>['categories']
   existingDebt?: Debt
   onSave: (d: Omit<Debt, 'id'>) => void
   onDelete?: () => void
   onClose: () => void
 }) {
+  const expenseCategories = categories.filter((c) => c.type === 'gasto')
   const [name, setName] = useState(existingDebt?.name ?? '')
   const [creditor, setCreditor] = useState(existingDebt?.creditor ?? '')
+  const [categoryId, setCategoryId] = useState(existingDebt?.categoryId ?? '')
   const [originalAmount, setOriginalAmount] = useState(existingDebt?.originalAmount ? String(existingDebt.originalAmount) : '')
   const [remainingAmount, setRemainingAmount] = useState(existingDebt ? String(existingDebt.remainingAmount) : '')
   const [monthlyPayment, setMonthlyPayment] = useState(existingDebt?.monthlyPayment ? String(existingDebt.monthlyPayment) : '')
@@ -286,6 +402,7 @@ function DebtSheet({
     onSave({
       name: name.trim(),
       creditor: creditor.trim() || undefined,
+      categoryId: categoryId || undefined,
       originalAmount: originalAmount ? Number(originalAmount.replace(/\D/g, '')) : undefined,
       remainingAmount: remainingNumber,
       monthlyPayment: monthlyPayment ? Number(monthlyPayment.replace(/\D/g, '')) : undefined,
@@ -311,6 +428,22 @@ function DebtSheet({
         </Field>
         <Field label="A quién se le debe (opcional)">
           <input value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Ej: Banco, o el nombre de una persona" className={inputCls} />
+        </Field>
+        <Field label="Categoría de los pagos (opcional)">
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {expenseCategories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCategoryId(categoryId === c.id ? '' : c.id)}
+                className={`flex flex-col items-center gap-1.5 shrink-0 ${categoryId === c.id ? '' : 'opacity-60'}`}
+              >
+                <div className={categoryId === c.id ? 'ring-2 ring-coral rounded-[14px]' : ''}>
+                  <CategoryIcon category={c} />
+                </div>
+                <span className="text-[10.5px] font-semibold">{c.name.split(' ')[0]}</span>
+              </button>
+            ))}
+          </div>
         </Field>
         <Field label="Monto original (opcional)">
           <input value={originalAmount} onChange={(e) => setOriginalAmount(e.target.value)} inputMode="numeric" placeholder="$0" className={inputCls} />
@@ -343,14 +476,36 @@ function DebtSheet({
   )
 }
 
-function PayDebtSheet({ debt, onSave, onClose }: { debt: Debt; onSave: (amount: number) => void; onClose: () => void }) {
+function PayDebtSheet({
+  debt,
+  categories,
+  onSave,
+  onClose,
+}: {
+  debt: Debt
+  categories: ReturnType<typeof useData>['categories']
+  onSave: (details: PaymentDetails) => void
+  onClose: () => void
+}) {
+  const me = useMe()
+  const expenseCategories = categories.filter((c) => c.type === 'gasto')
   const [amount, setAmount] = useState(debt.monthlyPayment ? String(debt.monthlyPayment) : '')
+  const [categoryId, setCategoryId] = useState(debt.categoryId ?? expenseCategories[0]?.id ?? '')
+  const [payer, setPayer] = useState<UserId>(me.id)
+  const [split, setSplit] = useState<SplitType>('personal')
   const amountNumber = Number(amount.replace(/\D/g, '')) || 0
+  const canSave = amountNumber > 0 && Boolean(categoryId)
+
+  function handleSave() {
+    if (!canSave) return
+    onSave({ amount: amountNumber, categoryId, date: new Date().toISOString().slice(0, 10), paidBy: payer, split })
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-end md:items-center md:justify-center">
       <div className="absolute inset-0 bg-text/40" onClick={onClose} />
-      <div className="relative w-full md:max-w-sm bg-surface rounded-t-3xl md:rounded-3xl px-5 pt-3.5 pb-7">
+      <div className="relative w-full md:max-w-sm bg-surface rounded-t-3xl md:rounded-3xl px-5 pt-3.5 pb-7 max-h-[88vh] overflow-y-auto">
         <div className="w-9 h-1 bg-border rounded-full mx-auto mb-4 md:hidden" />
         <div className="flex items-center justify-between mb-4.5">
           <h2 className="font-serif text-lg font-semibold">Registrar pago</h2>
@@ -359,14 +514,33 @@ function PayDebtSheet({ debt, onSave, onClose }: { debt: Debt; onSave: (amount: 
           </button>
         </div>
         <div className="text-xs text-text-muted mb-4">
-          Deben {formatCLP(debt.remainingAmount)} de {debt.name}. Este pago se descuenta de ese saldo.
+          Deben {formatCLP(debt.remainingAmount)} de {debt.name}. Esto se agrega como movimiento y se descuenta del saldo.
         </div>
         <Field label="Monto a pagar">
           <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder="$0" className={inputCls} />
         </Field>
+        {expenseCategories.length > 0 && (
+          <Field label="Categoría">
+            <div className="flex gap-2 overflow-x-auto pb-0.5">
+              {expenseCategories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategoryId(c.id)}
+                  className={`flex flex-col items-center gap-1.5 shrink-0 ${categoryId === c.id ? '' : 'opacity-60'}`}
+                >
+                  <div className={categoryId === c.id ? 'ring-2 ring-coral rounded-[14px]' : ''}>
+                    <CategoryIcon category={c} />
+                  </div>
+                  <span className="text-[10.5px] font-semibold">{c.name.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+        <PayerAndSplit payer={payer} onPayer={setPayer} split={split} onSplit={setSplit} />
         <button
-          onClick={() => amountNumber > 0 && (onSave(amountNumber), onClose())}
-          disabled={amountNumber <= 0}
+          onClick={handleSave}
+          disabled={!canSave}
           className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
         >
           Registrar pago
@@ -389,13 +563,13 @@ function RecurringPaymentSheet({
   onDelete?: () => void
   onClose: () => void
 }) {
-  const members = useMembers()
   const expenseCategories = categories.filter((c) => c.type === 'gasto')
   const [name, setName] = useState(existing?.name ?? '')
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? expenseCategories[0]?.id ?? '')
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '')
   const [dueDay, setDueDay] = useState(existing ? String(existing.dueDay) : '')
   const [payer, setPayer] = useState<UserId | null>(existing?.payer ?? null)
+  const members = useMembers()
 
   const amountNumber = Number(amount.replace(/\D/g, '')) || 0
   const dueDayNumber = Number(dueDay) || 0
@@ -448,7 +622,7 @@ function RecurringPaymentSheet({
           <input value={dueDay} onChange={(e) => setDueDay(e.target.value)} inputMode="numeric" placeholder="Ej: 12" className={inputCls} />
         </Field>
 
-        <Field label="¿Quién paga?">
+        <Field label="¿Quién paga habitualmente?">
           <div className="flex gap-2.5">
             <button
               onClick={() => setPayer(null)}
