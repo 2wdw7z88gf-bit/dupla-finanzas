@@ -13,6 +13,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error?: string }>
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
+  updateDisplayName: (name: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -136,11 +137,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  async function updateDisplayName(name: string) {
+    if (!supabase || !session) return
+    await supabase.from('household_members').update({ display_name: name }).eq('user_id', session.user.id)
+    // The household_members realtime subscription above refreshes `members` (and so `member`) once this lands.
+  }
+
   const userId = session?.user.id ?? null
   const member = members.find((m) => m.id === userId) ?? null
 
   return (
-    <AuthContext.Provider value={{ session, loading, householdId, userId, member, members, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ session, loading, householdId, userId, member, members, signUp, signIn, signOut, updateDisplayName }}
+    >
       {children}
     </AuthContext.Provider>
   )

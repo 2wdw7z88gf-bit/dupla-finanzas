@@ -85,6 +85,7 @@ export function mapSavingsGoal(row: any): SavingsGoal {
     currentAmount: num(row.current_amount),
     targetDate: row.target_date ?? undefined,
     monthlyContributionPlan: row.monthly_contribution_plan == null ? undefined : num(row.monthly_contribution_plan),
+    accountId: row.account_id ?? undefined,
   }
 }
 
@@ -98,6 +99,7 @@ export function savingsGoalToRow(householdId: string, goal: Omit<SavingsGoal, 'i
     current_amount: goal.currentAmount,
     target_date: goal.targetDate ?? null,
     monthly_contribution_plan: goal.monthlyContributionPlan ?? null,
+    account_id: goal.accountId ?? null,
   }
 }
 

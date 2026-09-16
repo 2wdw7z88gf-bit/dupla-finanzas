@@ -5,6 +5,7 @@ import {
   BellIcon,
   CalendarIcon,
   ChevronRightIcon,
+  CloseIcon,
   EditIcon,
   LogoutIcon,
   MailIcon,
@@ -16,15 +17,17 @@ import {
 import { Avatar } from '../components/ui/Avatar'
 import { useData } from '../state/DataContext'
 import { useAuth } from '../state/AuthContext'
-import { useMembers } from '../hooks/useMembers'
+import { useMe, useMembers } from '../hooks/useMembers'
 
 export function Ajustes() {
   const { categories, accounts } = useData()
-  const { signOut } = useAuth()
+  const { signOut, updateDisplayName } = useAuth()
   const members = useMembers()
+  const me = useMe()
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState(true)
   const [reconcileReminder, setReconcileReminder] = useState(true)
+  const [renaming, setRenaming] = useState(false)
 
   async function handleLogout() {
     await signOut()
@@ -47,7 +50,9 @@ export function Ajustes() {
           <div className="text-[15px] font-bold">{members.map((m) => m.displayName).join(' & ') || 'Tu hogar'}</div>
           <div className="text-[12.5px] text-text-muted">Espacio compartido</div>
         </div>
-        <EditIcon size={16} className="text-text-muted" />
+        <button onClick={() => setRenaming(true)} aria-label="Editar tu nombre">
+          <EditIcon size={16} className="text-text-muted" />
+        </button>
       </div>
 
       <SectionLabel>Cuenta</SectionLabel>
@@ -58,7 +63,7 @@ export function Ajustes() {
         <Row
           icon={<TrendingUpIcon size={19} />}
           label="Cuentas de ahorro"
-          value={`${accounts[0].name} · ${(accounts[0].annualInterestRate * 100).toFixed(1)}%`}
+          value={accounts[0] ? `${accounts[0].name} · ${(accounts[0].annualInterestRate * 100).toFixed(1)}%` : 'Ninguna'}
         />
         <Row icon={<MailIcon size={19} />} label="Correo del banco" value="2 conectados" to="/ajustes/correo" last />
       </Group>
@@ -83,6 +88,59 @@ export function Ajustes() {
           <span className="flex-1 text-[14.5px] font-bold">Cerrar sesión</span>
         </button>
       </Group>
+
+      {renaming && (
+        <RenameSheet currentName={me.displayName} onSave={updateDisplayName} onClose={() => setRenaming(false)} />
+      )}
+    </div>
+  )
+}
+
+function RenameSheet({
+  currentName,
+  onSave,
+  onClose,
+}: {
+  currentName: string
+  onSave: (name: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [name, setName] = useState(currentName)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!name.trim()) return
+    setSaving(true)
+    await onSave(name.trim())
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end md:items-center md:justify-center">
+      <div className="absolute inset-0 bg-text/40" onClick={onClose} />
+      <div className="relative w-full md:max-w-sm bg-surface rounded-t-3xl md:rounded-3xl px-5 pt-3.5 pb-7">
+        <div className="w-9 h-1 bg-border rounded-full mx-auto mb-4 md:hidden" />
+        <div className="flex items-center justify-between mb-4.5">
+          <h2 className="font-serif text-lg font-semibold">Tu nombre</h2>
+          <button onClick={onClose}>
+            <CloseIcon size={18} />
+          </button>
+        </div>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Tu nombre"
+          className="w-full border border-border rounded-xl px-3.5 py-3 text-[15px] mb-6 bg-bg outline-none"
+        />
+        <button
+          onClick={handleSave}
+          disabled={!name.trim() || saving}
+          className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
+        >
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
     </div>
   )
 }

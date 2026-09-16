@@ -1,4 +1,4 @@
-import type { Account, Category, HouseholdMember, Settlement, Transaction, UserId } from '../types'
+import type { Account, Category, HouseholdMember, SavingsGoal, Settlement, Transaction, UserId } from '../types'
 import { relativeDay } from './format'
 
 export function categoryById(categories: Category[], id: string | null): Category {
@@ -46,6 +46,19 @@ export function projectedAccountBalance(account: Account, asOf: Date = new Date(
     accrued: Math.round(accrued),
     projected: Math.round(account.balance + accrued),
   }
+}
+
+/**
+ * A goal linked to an account tracks that account's live (estimated) balance
+ * instead of its own stored `currentAmount` — so progress updates itself as
+ * the account earns interest, instead of needing to be typed in by hand.
+ */
+export function goalCurrentAmount(goal: SavingsGoal, accounts: Account[]): number {
+  if (goal.accountId) {
+    const account = accounts.find((a) => a.id === goal.accountId)
+    if (account) return projectedAccountBalance(account).projected
+  }
+  return goal.currentAmount
 }
 
 /** Given a 2-person household, returns whichever id in `members` is NOT `id`. */

@@ -61,6 +61,8 @@ export interface SavingsGoal {
   currentAmount: number
   targetDate?: string
   monthlyContributionPlan?: number
+  /** When set, the goal's progress tracks this account's balance instead of `currentAmount`. */
+  accountId?: string
 }
 
 export interface Settlement {

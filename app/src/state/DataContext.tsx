@@ -58,6 +58,7 @@ interface DataContextValue {
   addAccount: (account: Omit<Account, 'id'>) => void
   reconcileAccount: (id: string, balance: number) => void
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => void
+  updateSavingsGoal: (id: string, patch: Partial<Omit<SavingsGoal, 'id'>>) => void
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -196,6 +197,20 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('savings_goals').insert(savingsGoalToRow(householdId, goal))
   }
 
+  async function updateSavingsGoal(id: string, patch: Partial<Omit<SavingsGoal, 'id'>>) {
+    if (!supabase) return
+    const row: Record<string, unknown> = {}
+    if (patch.name !== undefined) row.name = patch.name
+    if (patch.icon !== undefined) row.icon = patch.icon
+    if (patch.color !== undefined) row.color = patch.color
+    if (patch.targetAmount !== undefined) row.target_amount = patch.targetAmount
+    if (patch.currentAmount !== undefined) row.current_amount = patch.currentAmount
+    if (patch.targetDate !== undefined) row.target_date = patch.targetDate ?? null
+    if (patch.monthlyContributionPlan !== undefined) row.monthly_contribution_plan = patch.monthlyContributionPlan ?? null
+    if (patch.accountId !== undefined) row.account_id = patch.accountId ?? null
+    await supabase.from('savings_goals').update(row).eq('id', id)
+  }
+
   const value: DataContextValue = {
     transactions,
     categories,
@@ -215,6 +230,7 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     addAccount,
     reconcileAccount,
     addSavingsGoal,
+    updateSavingsGoal,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
@@ -286,6 +302,7 @@ function MockDataProvider({ children }: { children: ReactNode }) {
           prev.map((a) => (a.id === id ? { ...a, balance, lastReconciledAt: new Date().toISOString().slice(0, 10) } : a)),
         ),
       addSavingsGoal: (goal) => setSavingsGoals((prev) => [...prev, { ...goal, id: crypto.randomUUID() }]),
+      updateSavingsGoal: (id, patch) => setSavingsGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
     }),
     [transactions, categories, budgets, accounts, savingsGoals, recurringPayments, draftTransactions, settlements],
   )

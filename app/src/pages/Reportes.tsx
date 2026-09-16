@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
-import { CloseIcon, PlaneIcon, PlusIcon, RingsIcon, ShieldIcon, TrendingUpIcon } from '../components/icons/Icons'
+import { CloseIcon, EditIcon, PlaneIcon, PlusIcon, RingsIcon, ShieldIcon, TrendingUpIcon } from '../components/icons/Icons'
 import { useData } from '../state/DataContext'
 import { MONTHLY_SPENDING } from '../data/mock'
 import { useMembers } from '../hooks/useMembers'
-import { categoryById, projectedAccountBalance, totalByType } from '../lib/calc'
+import { categoryById, goalCurrentAmount, projectedAccountBalance, totalByType } from '../lib/calc'
 import { formatCLP, monthName } from '../lib/format'
 import { CATEGORY_CHART_COLOR, CHART } from '../lib/chartColors'
 import type { SavingsGoal } from '../types'
@@ -18,11 +18,13 @@ const GOAL_COLOR_CLASSES: Record<string, { bg: string; fg: string; bar: string }
 }
 
 export function Reportes() {
-  const { transactions, categories, accounts, savingsGoals, addAccount, reconcileAccount, addSavingsGoal } = useData()
+  const { transactions, categories, accounts, savingsGoals, addAccount, reconcileAccount, addSavingsGoal, updateSavingsGoal } =
+    useData()
   const members = useMembers()
   const [addingAccount, setAddingAccount] = useState(false)
   const [reconciling, setReconciling] = useState(false)
   const [addingGoal, setAddingGoal] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null)
   const thisMonthSpent = totalByType(transactions, categories, 'gasto')
   const monthlyData = [...MONTHLY_SPENDING, { month: monthName().slice(0, 3), total: thisMonthSpent }]
 
@@ -174,7 +176,9 @@ export function Reportes() {
         {savingsGoals.map((goal) => {
           const Icon = GOAL_ICONS[goal.icon]
           const colors = GOAL_COLOR_CLASSES[goal.color]
-          const pct = Math.round((goal.currentAmount / goal.targetAmount) * 100)
+          const linkedAccount = goal.accountId ? accounts.find((a) => a.id === goal.accountId) : undefined
+          const currentAmt = goalCurrentAmount(goal, accounts)
+          const pct = Math.round((currentAmt / goal.targetAmount) * 100)
           const content = (
             <>
               <div className="flex items-center gap-2.5 mb-2.5">
@@ -183,17 +187,30 @@ export function Reportes() {
                 </div>
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-sm font-bold">{goal.name}</span>
-                  <span className="text-[12.5px] text-text-muted font-bold">{pct}%</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[12.5px] text-text-muted font-bold">{pct}%</span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setEditingGoal(goal)
+                      }}
+                      aria-label="Editar meta"
+                    >
+                      <EditIcon size={14} className="text-text-muted" />
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="h-2 bg-surface-2 rounded-full overflow-hidden mb-1.5">
-                <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">
-                  {formatCLP(goal.currentAmount)} de {formatCLP(goal.targetAmount)}
+                  {formatCLP(currentAmt)} de {formatCLP(goal.targetAmount)}
+                  {linkedAccount && <span className="text-coral"> · vinculada a {linkedAccount.name}</span>}
                 </span>
-                {goal.targetDate && <span className="text-xs text-coral font-bold">Ver simulador →</span>}
+                {goal.targetDate && <span className="text-xs text-coral font-bold shrink-0 ml-2">Ver simulador →</span>}
               </div>
             </>
           )
@@ -231,7 +248,16 @@ export function Reportes() {
         />
       )}
 
-      {addingGoal && <NewGoalSheet onSave={addSavingsGoal} onClose={() => setAddingGoal(false)} />}
+      {addingGoal && <NewGoalSheet accounts={accounts} onSave={addSavingsGoal} onClose={() => setAddingGoal(false)} />}
+
+      {editingGoal && (
+        <NewGoalSheet
+          accounts={accounts}
+          existingGoal={editingGoal}
+          onSave={(patch) => updateSavingsGoal(editingGoal.id, patch)}
+          onClose={() => setEditingGoal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -331,19 +357,33 @@ function ReconcileSheet({
   )
 }
 
-function NewGoalSheet({ onSave, onClose }: { onSave: (g: Omit<SavingsGoal, 'id'>) => void; onClose: () => void }) {
-  const [name, setName] = useState('')
-  const [icon, setIcon] = useState<SavingsGoal['icon']>('plane')
-  const [color, setColor] = useState<SavingsGoal['color']>('teal')
-  const [targetAmount, setTargetAmount] = useState('')
-  const [currentAmount, setCurrentAmount] = useState('')
-  const [hasDate, setHasDate] = useState(false)
-  const [targetDate, setTargetDate] = useState('')
-  const [monthlyPlan, setMonthlyPlan] = useState('')
+function NewGoalSheet({
+  accounts,
+  existingGoal,
+  onSave,
+  onClose,
+}: {
+  accounts: ReturnType<typeof useData>['accounts']
+  existingGoal?: SavingsGoal
+  onSave: (g: Omit<SavingsGoal, 'id'>) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState(existingGoal?.name ?? '')
+  const [icon, setIcon] = useState<SavingsGoal['icon']>(existingGoal?.icon ?? 'plane')
+  const [color, setColor] = useState<SavingsGoal['color']>(existingGoal?.color ?? 'teal')
+  const [targetAmount, setTargetAmount] = useState(existingGoal ? String(existingGoal.targetAmount) : '')
+  const [currentAmount, setCurrentAmount] = useState(existingGoal ? String(existingGoal.currentAmount) : '')
+  const [accountId, setAccountId] = useState<string>(existingGoal?.accountId ?? '')
+  const [hasDate, setHasDate] = useState(Boolean(existingGoal?.targetDate))
+  const [targetDate, setTargetDate] = useState(existingGoal?.targetDate ?? '')
+  const [monthlyPlan, setMonthlyPlan] = useState(
+    existingGoal?.monthlyContributionPlan ? String(existingGoal.monthlyContributionPlan) : '',
+  )
 
   const targetNumber = Number(targetAmount.replace(/\D/g, '')) || 0
   const currentNumber = Number(currentAmount.replace(/\D/g, '')) || 0
   const canSave = name.trim().length > 0 && targetNumber > 0
+  const linkedAccount = accounts.find((a) => a.id === accountId)
 
   function handleSave() {
     if (!canSave) return
@@ -353,6 +393,7 @@ function NewGoalSheet({ onSave, onClose }: { onSave: (g: Omit<SavingsGoal, 'id'>
       color,
       targetAmount: targetNumber,
       currentAmount: currentNumber,
+      accountId: accountId || undefined,
       targetDate: hasDate && targetDate ? targetDate : undefined,
       monthlyContributionPlan: hasDate && monthlyPlan ? Number(monthlyPlan.replace(/\D/g, '')) : undefined,
     })
@@ -360,7 +401,7 @@ function NewGoalSheet({ onSave, onClose }: { onSave: (g: Omit<SavingsGoal, 'id'>
   }
 
   return (
-    <Sheet title="Nueva meta de ahorro" onClose={onClose}>
+    <Sheet title={existingGoal ? 'Editar meta' : 'Nueva meta de ahorro'} onClose={onClose}>
       <Field label="Nombre">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Viaje al sur" className={inputCls} />
       </Field>
@@ -396,9 +437,35 @@ function NewGoalSheet({ onSave, onClose }: { onSave: (g: Omit<SavingsGoal, 'id'>
       <Field label="Monto meta">
         <input value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} inputMode="numeric" placeholder="$0" className={inputCls} />
       </Field>
-      <Field label="Ahorro actual">
-        <input value={currentAmount} onChange={(e) => setCurrentAmount(e.target.value)} inputMode="numeric" placeholder="$0" className={inputCls} />
-      </Field>
+
+      {accounts.length > 0 && (
+        <Field label="Vincular a una cuenta de ahorro (opcional)">
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputCls}>
+            <option value="">Ninguna — monto manual</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      {linkedAccount ? (
+        <div className="text-xs text-text-muted mb-4.5 -mt-2">
+          El ahorro actual va a seguir el saldo real de <b className="text-text">{linkedAccount.name}</b> automáticamente.
+        </div>
+      ) : (
+        <Field label="Ahorro actual">
+          <input
+            value={currentAmount}
+            onChange={(e) => setCurrentAmount(e.target.value)}
+            inputMode="numeric"
+            placeholder="$0"
+            className={inputCls}
+          />
+        </Field>
+      )}
 
       <label className="flex items-center gap-2.5 mb-4.5 text-[13.5px] font-semibold">
         <input type="checkbox" checked={hasDate} onChange={(e) => setHasDate(e.target.checked)} className="w-4 h-4 accent-coral" />
@@ -421,7 +488,7 @@ function NewGoalSheet({ onSave, onClose }: { onSave: (g: Omit<SavingsGoal, 'id'>
         disabled={!canSave}
         className="w-full bg-coral text-surface font-bold text-[15px] rounded-xl py-3.5 disabled:opacity-40"
       >
-        Guardar meta
+        {existingGoal ? 'Guardar cambios' : 'Guardar meta'}
       </button>
     </Sheet>
   )

@@ -2,9 +2,10 @@ import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from './nav'
 import { GearIcon } from '../icons/Icons'
 import { Avatar } from '../ui/Avatar'
-import { PEOPLE } from '../../data/mock'
+import { useMe } from '../../hooks/useMembers'
 
 export function Sidebar() {
+  const me = useMe()
   return (
     <aside className="hidden md:flex md:flex-col w-60 shrink-0 bg-surface border-r border-border p-7">
       <div className="flex items-center gap-2.5 px-2 mb-9">
@@ -39,9 +40,9 @@ export function Sidebar() {
         to="/ajustes"
         className="flex items-center gap-2.5 pt-[18px] border-t border-border px-2 py-2.5 rounded-xl hover:bg-surface-2"
       >
-        <Avatar person={PEOPLE.luciana} size={34} />
+        <Avatar person={me} size={34} />
         <div className="flex-1">
-          <div className="text-[13px] font-bold">Luciana</div>
+          <div className="text-[13px] font-bold">{me.displayName}</div>
           <div className="text-[11.5px] text-text-muted">Ver ajustes</div>
         </div>
         <GearIcon size={17} className="text-text-muted" />

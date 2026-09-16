@@ -4,7 +4,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { AlertTriangleIcon, PlusIcon, RingsIcon } from '../components/icons/Icons'
 import { useData } from '../state/DataContext'
-import { goalProjection } from '../lib/calc'
+import { goalCurrentAmount, goalProjection } from '../lib/calc'
 import { formatCLP, formatDate } from '../lib/format'
 import type { SavingsGoal } from '../types'
 
@@ -12,26 +12,26 @@ const STEP = 10000
 
 export function MetaMatrimonio() {
   const { goalId } = useParams()
-  const { savingsGoals } = useData()
+  const { savingsGoals, accounts } = useData()
   const goal = savingsGoals.find((g) => g.id === goalId && g.targetDate)
 
   if (!goal) {
     return <PageHeader title="Meta no encontrada" backTo="/reportes" />
   }
 
-  return <GoalSimulator goal={goal} />
+  return <GoalSimulator goal={goal} currentAmount={goalCurrentAmount(goal, accounts)} />
 }
 
-function GoalSimulator({ goal }: { goal: SavingsGoal }) {
+function GoalSimulator({ goal, currentAmount }: { goal: SavingsGoal; currentAmount: number }) {
   const [monthly, setMonthly] = useState(goal.monthlyContributionPlan ?? 100000)
 
   const { monthsLeft, projected, shortfall, breakEvenMonthly } = goalProjection({
-    currentAmount: goal.currentAmount,
+    currentAmount,
     targetAmount: goal.targetAmount,
     targetDate: goal.targetDate!,
     monthlyContribution: monthly,
   })
-  const pct = Math.round((goal.currentAmount / goal.targetAmount) * 100)
+  const pct = Math.round((currentAmount / goal.targetAmount) * 100)
 
   return (
     <div>
@@ -45,9 +45,10 @@ function GoalSimulator({ goal }: { goal: SavingsGoal }) {
           Para el {formatDate(goal.targetDate!)} de {new Date(goal.targetDate!).getFullYear()} · faltan {monthsLeft} meses
         </div>
         <div className="font-serif text-[30px] font-bold mt-2.5">
-          {formatCLP(goal.currentAmount)}{' '}
+          {formatCLP(currentAmount)}{' '}
           <span className="text-[15px] text-text-muted font-semibold">de {formatCLP(goal.targetAmount)}</span>
         </div>
+        {goal.accountId && <div className="text-[11.5px] text-coral font-semibold mt-1">Siguiendo el saldo de su cuenta de ahorro</div>}
         <div className="mt-3.5">
           <ProgressBar percent={pct} color="gold" />
         </div>
