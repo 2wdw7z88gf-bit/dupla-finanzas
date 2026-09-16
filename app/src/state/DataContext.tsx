@@ -64,7 +64,8 @@ interface DataContextValue {
   draftTransactions: DraftTransaction[]
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<string | undefined>
   updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void
-  deleteTransaction: (id: string) => void
+  /** Resolves to an error message if the delete failed (e.g. blocked by something referencing it), otherwise undefined. */
+  deleteTransaction: (id: string) => Promise<string | undefined>
   addCategory: (cat: Omit<Category, 'id'>) => void
   addRecurringPayment: (r: Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>) => void
   updateRecurringPayment: (id: string, patch: Partial<Omit<RecurringPayment, 'id' | 'paidThisMonth' | 'paidOn'>>) => void
@@ -172,9 +173,10 @@ function RealDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('transactions').update(row).eq('id', id)
   }
 
-  async function deleteTransaction(id: string) {
-    if (!supabase) return
-    await supabase.from('transactions').delete().eq('id', id)
+  async function deleteTransaction(id: string): Promise<string | undefined> {
+    if (!supabase) return undefined
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    return error?.message
   }
 
   async function addCategory(cat: Omit<Category, 'id'>) {
@@ -401,7 +403,10 @@ function MockDataProvider({ children }: { children: ReactNode }) {
         return id
       },
       updateTransaction: (id, patch) => setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))),
-      deleteTransaction: (id) => setTransactions((prev) => prev.filter((t) => t.id !== id)),
+      deleteTransaction: async (id) => {
+        setTransactions((prev) => prev.filter((t) => t.id !== id))
+        return undefined
+      },
       addCategory: (cat) => setCategories((prev) => [...prev, { ...cat, id: crypto.randomUUID() }]),
       addRecurringPayment: (r) =>
         setRecurringPayments((prev) => [...prev, { ...r, id: crypto.randomUUID(), paidThisMonth: false }]),

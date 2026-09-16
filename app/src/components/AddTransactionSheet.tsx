@@ -28,6 +28,7 @@ export function AddTransactionSheet({
   const [categoryId, setCategoryId] = useState<string | null>(existingTransaction?.categoryId ?? null)
   const [payer, setPayer] = useState<UserId>(existingTransaction?.paidBy ?? me.id)
   const [split, setSplit] = useState<SplitType>(existingTransaction?.split ?? '50/50')
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const filteredCategories = categories.filter((c) => c.type === kind)
   const selectedCategory = categoryId ?? filteredCategories[0]?.id
@@ -51,9 +52,13 @@ export function AddTransactionSheet({
     onClose()
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!existingTransaction) return
-    deleteTransaction(existingTransaction.id)
+    const error = await deleteTransaction(existingTransaction.id)
+    if (error) {
+      setDeleteError('No se pudo eliminar. Puede que algo más (como un pago fijo) esté enlazado a este movimiento.')
+      return
+    }
     onClose()
   }
 
@@ -165,9 +170,12 @@ export function AddTransactionSheet({
         </button>
 
         {isEditing && (
-          <button onClick={handleDelete} className="w-full text-danger font-bold text-[13.5px] py-3.5">
-            Eliminar movimiento
-          </button>
+          <>
+            <button onClick={handleDelete} className="w-full text-danger font-bold text-[13.5px] py-3.5">
+              Eliminar movimiento
+            </button>
+            {deleteError && <p className="text-xs text-danger text-center -mt-2 mb-1">{deleteError}</p>}
+          </>
         )}
       </div>
     </div>
