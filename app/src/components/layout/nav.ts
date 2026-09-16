@@ -1,4 +1,4 @@
-import { BarChartIcon, ExchangeIcon, HomeIcon, ScaleIcon, TargetIcon } from '../icons/Icons'
+import { BarChartIcon, ExchangeIcon, HomeIcon, RepeatIcon, ScaleIcon, TargetIcon } from '../icons/Icons'
 import type { ComponentType } from 'react'
 
 interface NavItem {
@@ -14,5 +14,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/movimientos', label: 'Movimientos', shortLabel: 'Movs', Icon: ExchangeIcon },
   { to: '/presupuestos', label: 'Presupuestos', shortLabel: 'Presup.', Icon: TargetIcon },
   { to: '/saldos', label: 'Saldos', Icon: ScaleIcon },
+  { to: '/pagos-fijos', label: 'Pagos fijos', shortLabel: 'Pagos', Icon: RepeatIcon },
   { to: '/reportes', label: 'Reportes', Icon: BarChartIcon },
 ]

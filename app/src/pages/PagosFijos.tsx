@@ -44,7 +44,6 @@ export function PagosFijos() {
     <div>
       <PageHeader
         title="Pagos fijos"
-        backTo="/"
         action={
           <button
             onClick={() => setAddingRecurring(true)}
